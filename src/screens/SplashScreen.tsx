@@ -1,5 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import {
+    Animated,
+    Easing,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 
 type Props = {
     navigation: any;
@@ -7,47 +13,113 @@ type Props = {
 
 const SplashScreen = ({ navigation }: Props) => {
     const logoOpacity = useRef(new Animated.Value(0)).current;
-    const logoScale = useRef(new Animated.Value(0.7)).current;
+    const logoScale = useRef(new Animated.Value(0.75)).current;
+    const glowOpacity = useRef(new Animated.Value(0)).current;
+    const shimmerPosition = useRef(new Animated.Value(-1)).current;
     const subtitleOpacity = useRef(new Animated.Value(0)).current;
-    const subtitleTranslate = useRef(new Animated.Value(30)).current;
+    const subtitleTranslate = useRef(new Animated.Value(25)).current;
+    const loaderOpacity = useRef(new Animated.Value(0)).current;
+    const loaderScale = useRef(new Animated.Value(0.5)).current;
 
     useEffect(() => {
+        Animated.timing(glowOpacity, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+        }).start();
+
         Animated.parallel([
             Animated.timing(logoOpacity, {
                 toValue: 1,
-                duration: 800,
+                duration: 900,
+                easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
             }),
 
             Animated.spring(logoScale, {
                 toValue: 1,
                 friction: 5,
-                tension: 40,
+                tension: 45,
                 useNativeDriver: true,
             }),
         ]).start(() => {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(shimmerPosition, {
+                        toValue: 1,
+                        duration: 1200,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(shimmerPosition, {
+                        toValue: -1,
+                        duration: 1200,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ]),
+                {
+                    iterations: 2,
+                },
+            ).start();
+
             Animated.parallel([
                 Animated.timing(subtitleOpacity, {
                     toValue: 1,
-                    duration: 600,
+                    duration: 650,
+                    easing: Easing.out(Easing.ease),
                     useNativeDriver: true,
                 }),
 
                 Animated.timing(subtitleTranslate, {
                     toValue: 0,
-                    duration: 600,
+                    duration: 650,
+                    easing: Easing.out(Easing.ease),
                     useNativeDriver: true,
                 }),
-            ]).start(() => {
-                setTimeout(() => {
-                    navigation.replace('Registration');
-                }, 2000);
-            });
+            ]).start();
+
+            Animated.parallel([
+                Animated.timing(loaderOpacity, {
+                    toValue: 1,
+                    duration: 500,
+                    delay: 400,
+                    useNativeDriver: true,
+                }),
+
+                Animated.spring(loaderScale, {
+                    toValue: 1,
+                    friction: 5,
+                    tension: 50,
+                    delay: 400,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+
+            setTimeout(() => {
+                navigation.replace('Registration');
+            }, 3500);
         });
     }, [navigation]);
 
+    const shimmerTranslate = shimmerPosition.interpolate({
+        inputRange: [-1, 1],
+        outputRange: [-80, 80],
+    });
+
     return (
         <View style={styles.container}>
+            <Animated.View
+                style={[
+                    styles.glow,
+                    {
+                        opacity: glowOpacity,
+                        transform: [{ scale: logoScale }],
+                    },
+                ]}
+            />
+
             <Animated.View
                 style={[
                     styles.logoContainer,
@@ -58,6 +130,16 @@ const SplashScreen = ({ navigation }: Props) => {
                 ]}
             >
                 <Text style={styles.logo}>GOLD KING</Text>
+
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.shimmer,
+                        {
+                            transform: [{ translateX: shimmerTranslate }],
+                        },
+                    ]}
+                />
             </Animated.View>
 
             <Animated.View
@@ -71,6 +153,20 @@ const SplashScreen = ({ navigation }: Props) => {
             >
                 <Text style={styles.subtitle}>Jewellery & Gold</Text>
             </Animated.View>
+
+            <Animated.View
+                style={[
+                    styles.loaderContainer,
+                    {
+                        opacity: loaderOpacity,
+                        transform: [{ scale: loaderScale }],
+                    },
+                ]}
+            >
+                <View style={styles.loaderDot} />
+                <View style={styles.loaderDot} />
+                <View style={styles.loaderDot} />
+            </Animated.View>
         </View>
     );
 };
@@ -78,30 +174,64 @@ const SplashScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#111111',
+        backgroundColor: '#000000ff',
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+
+    glow: {
+        position: 'absolute',
+        width: 260,
+        height: 260,
+        borderRadius: 130,
+        backgroundColor: '#a4a4a4ff',
     },
 
     logoContainer: {
         alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
     },
 
     logo: {
-        fontSize: 38,
-        fontWeight: 'bold',
-        color: '#D4AF37',
-        letterSpacing: 3,
+        fontSize: 40,
+        fontWeight: '800',
+        color: '#ecbe32ff',
+        letterSpacing: 4,
+    },
+
+    shimmer: {
+        position: 'absolute',
+        width: 25,
+        borderRadius: 80,
+        height: 80,
+        backgroundColor: 'rgba(255, 255, 255, 0.62)',
+        transform: [{ rotate: '20deg' }],
     },
 
     subtitleContainer: {
-        marginTop: 10,
+        marginTop: 12,
     },
 
     subtitle: {
         fontSize: 15,
-        color: '#FFFFFF',
-        letterSpacing: 1.5,
+        color: '#000000ff',
+        letterSpacing: 2,
+    },
+
+    loaderContainer: {
+        position: 'absolute',
+        bottom: 80,
+        flexDirection: 'row',
+        gap: 7,
+    },
+
+    loaderDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: '#f7d567ff',
     },
 });
 

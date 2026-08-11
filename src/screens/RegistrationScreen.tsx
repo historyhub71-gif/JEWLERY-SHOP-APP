@@ -1,3 +1,4 @@
+import SweetAlert from 'react-native-sweet-alert';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -23,6 +24,9 @@ const RegistrationScreen = () => {
     const [address, setAddress] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const handleRegister = async () => {
         if (
             !fullName.trim() ||
@@ -33,22 +37,38 @@ const RegistrationScreen = () => {
             !city.trim() ||
             !address.trim()
         ) {
-            Alert.alert('Missing Information', 'Please fill all fields.');
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Missing Information',
+                subTitle: 'Please fill all fields.',
+                confirmButtonTitle: 'OK',
+            });
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Password Error', 'Passwords do not match.');
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Password Error',
+                subTitle: 'Passwords do not match.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+
             return;
         }
 
         if (password.length < 6) {
-            Alert.alert(
-                'Password Error',
-                'Password must be at least 6 characters.'
-            );
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Password Error',
+                subTitle: 'Password must be at least 6 characters.',
+                confirmButtonTitle: 'OK',
+            });
             return;
         }
+
+
 
         try {
             setLoading(true);
@@ -85,7 +105,7 @@ const RegistrationScreen = () => {
 
             Alert.alert(
                 'Registration Successful',
-                'Your registration has been submitted. Please wait for admin approval.'
+                'Your registration has been submitted. Please wait for admin approval.',
             );
 
             setFullName('');
@@ -98,7 +118,7 @@ const RegistrationScreen = () => {
         } catch (error: any) {
             Alert.alert(
                 'Registration Failed',
-                error?.message || 'Something went wrong.'
+                error?.message || 'Something went wrong.',
             );
         } finally {
             setLoading(false);
@@ -113,73 +133,156 @@ const RegistrationScreen = () => {
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
             >
-                <View style={styles.formContainer}>
-                    <Text style={styles.title}>Gold King</Text>
+                <View style={styles.header}>
 
-                    <Text style={styles.subtitle}>Create Your Account</Text>
+                    <Text style={styles.brand}>GOLD KING</Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Full Name"
-                        placeholderTextColor="#888"
-                        value={fullName}
-                        onChangeText={setFullName}
-                    />
+                    <Text style={styles.tagline}>JEWELLERY & GOLD</Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Phone Number"
-                        placeholderTextColor="#888"
-                        value={phone}
-                        onChangeText={setPhone}
-                        keyboardType="phone-pad"
-                    />
+                    <View style={styles.goldLine} />
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        placeholderTextColor="#888"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
+                    <Text style={styles.heading}>Create Account</Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Password"
-                        placeholderTextColor="#888"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                    />
+                    <Text style={styles.description}>
+                        Join Gold King and create your account
+                    </Text>
+                </View>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Confirm Password"
-                        placeholderTextColor="#888"
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        secureTextEntry
-                    />
+                <View style={styles.formCard}>
+                    <Text style={styles.sectionTitle}>
+                        PERSONAL INFORMATION
+                    </Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="City"
-                        placeholderTextColor="#888"
-                        value={city}
-                        onChangeText={setCity}
-                    />
+                    <Text style={styles.label}>Full Name</Text>
 
-                    <TextInput
-                        style={[styles.input, styles.addressInput]}
-                        placeholder="Address"
-                        placeholderTextColor="#888"
-                        value={address}
-                        onChangeText={setAddress}
-                        multiline
-                    />
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>●</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your full name"
+                            placeholderTextColor="#777"
+                            value={fullName}
+                            onChangeText={setFullName}
+                        />
+                    </View>
+
+                    <Text style={styles.label}>Phone Number</Text>
+
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>☎</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter phone number"
+                            placeholderTextColor="#777"
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
+                        />
+                    </View>
+
+                    <Text style={styles.label}>Email Address</Text>
+
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>✉</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter email address"
+                            placeholderTextColor="#777"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                    </View>
+
+                    <Text style={styles.label}>City</Text>
+
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>⌖</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your city"
+                            placeholderTextColor="#777"
+                            value={city}
+                            onChangeText={setCity}
+                        />
+                    </View>
+
+                    <Text style={styles.label}>Address</Text>
+
+                    <View style={styles.addressWrapper}>
+                        <Text style={styles.inputIcon}>⌂</Text>
+
+                        <TextInput
+                            style={styles.addressInput}
+                            placeholder="Enter your complete address"
+                            placeholderTextColor="#777"
+                            value={address}
+                            onChangeText={setAddress}
+                            multiline
+                            textAlignVertical="top"
+                        />
+                    </View>
+
+                    <Text style={[styles.sectionTitle, styles.securityTitle]}>
+                        SECURITY
+                    </Text>
+
+                    <Text style={styles.label}>Password</Text>
+
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>●</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Create a password"
+                            placeholderTextColor="#777"
+                            value={password}
+                            onChangeText={setPassword}
+                            secureTextEntry={!showPassword}
+                        />
+
+                        <TouchableOpacity
+                            onPress={() => setShowPassword(!showPassword)}
+                            style={styles.eyeButton}
+                        >
+                            <Text style={styles.eyeIcon}>
+                                {showPassword ? '👁' : '👁'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <Text style={styles.label}>Confirm Password</Text>
+
+                    <View style={styles.inputWrapper}>
+                        <Text style={styles.inputIcon}>●</Text>
+
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Confirm your password"
+                            placeholderTextColor="#777"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            secureTextEntry={!showConfirmPassword}
+                        />
+
+                        <TouchableOpacity
+                            onPress={() =>
+                                setShowConfirmPassword(!showConfirmPassword)
+                            }
+                            style={styles.eyeButton}
+                        >
+                            <Text style={styles.eyeIcon}>
+                                {showConfirmPassword ? '👁' : '👁'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <TouchableOpacity
                         style={[
@@ -188,11 +291,16 @@ const RegistrationScreen = () => {
                         ]}
                         onPress={handleRegister}
                         disabled={loading}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.registerButtonText}>
-                            {loading ? 'Registering...' : 'Register'}
+                        <Text style={styles.buttonText}>
+                            {loading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
                         </Text>
                     </TouchableOpacity>
+
+                    <Text style={styles.bottomText}>
+                        By creating an account, you agree to Gold King's terms.
+                    </Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -202,69 +310,170 @@ const RegistrationScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#111111',
+        backgroundColor: '#080808',
     },
 
     scrollContent: {
         flexGrow: 1,
-        justifyContent: 'center',
-        padding: 24,
+        paddingHorizontal: 20,
+        paddingTop: 40,
+        paddingBottom: 35,
     },
 
-    formContainer: {
-        width: '100%',
+    header: {
+        alignItems: 'center',
+        marginBottom: 25,
     },
-
-    title: {
-        fontSize: 36,
-        fontWeight: 'bold',
+    logoSymbol: {
         color: '#D4AF37',
-        textAlign: 'center',
-        marginBottom: 8,
+        fontSize: 50,
+        fontWeight: '800',
     },
 
-    subtitle: {
-        fontSize: 20,
+    brand: {
+        color: '#D4AF37',
+        fontSize: 30,
+        fontWeight: '800',
+        letterSpacing: 4,
+    },
+
+    tagline: {
+        color: '#999',
+        fontSize: 10,
+        letterSpacing: 3,
+        marginTop: 5,
+    },
+
+    goldLine: {
+        width: 55,
+        height: 2,
+        backgroundColor: '#D4AF37',
+        marginTop: 12,
+        marginBottom: 11,
+    },
+
+    heading: {
         color: '#FFFFFF',
-        textAlign: 'center',
-        marginBottom: 28,
+        fontSize: 25,
+        fontWeight: '700',
     },
 
-    input: {
-        height: 52,
+    description: {
+        color: '#777',
+        fontSize: 13,
+        marginTop: 6,
+    },
+
+    formCard: {
+        backgroundColor: '#111111',
         borderWidth: 1,
-        borderColor: '#444444',
-        borderRadius: 10,
-        backgroundColor: '#1B1B1B',
-        color: '#FFFFFF',
-        paddingHorizontal: 16,
-        marginBottom: 14,
+        borderColor: '#252525',
+        borderRadius: 20,
+        padding: 20,
+    },
+
+    sectionTitle: {
+        color: '#D4AF37',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.8,
+        marginBottom: 18,
+    },
+
+    securityTitle: {
+        marginTop: 2,
+    },
+
+    label: {
+        color: '#CFCFCF',
+        fontSize: 13,
+        fontWeight: '600',
+        marginBottom: 1,
+    },
+
+    inputWrapper: {
+        minHeight: 54,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#181818',
+        borderWidth: 1,
+        borderColor: '#292929',
+        borderRadius: 12,
+        marginBottom: 16,
+        paddingHorizontal: 14,
+    },
+
+    inputIcon: {
+        width: 27,
+        color: '#D4AF37',
         fontSize: 16,
     },
 
-    addressInput: {
-        height: 90,
-        textAlignVertical: 'top',
+    input: {
+        flex: 1,
+        minHeight: 52,
+        color: '#FFFFFF',
+        fontSize: 15,
+        paddingVertical: 0,
+    },
+
+    addressWrapper: {
+        minHeight: 90,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#181818',
+        borderWidth: 1,
+        borderColor: '#292929',
+        borderRadius: 12,
+        marginBottom: 16,
+        paddingHorizontal: 14,
         paddingTop: 14,
     },
 
+    addressInput: {
+        flex: 1,
+        minHeight: 70,
+        color: '#FFFFFF',
+        fontSize: 15,
+        paddingTop: 0,
+    },
+    eyeButton: {
+        width: 35,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    eyeIcon: {
+        color: '#D4AF37',
+        fontSize: 17,
+    },
     registerButton: {
-        height: 54,
+        height: 56,
         backgroundColor: '#D4AF37',
-        borderRadius: 10,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 8,
     },
 
     disabledButton: {
-        opacity: 0.6,
+        opacity: 0.55,
     },
 
-    registerButtonText: {
-        color: '#111111',
-        fontSize: 18,
-        fontWeight: 'bold',
+    buttonText: {
+        color: '#080808',
+        fontSize: 15,
+        fontWeight: '800',
+        letterSpacing: 1.2,
+    },
+
+    bottomText: {
+        color: '#666',
+        textAlign: 'center',
+        fontSize: 11,
+        marginTop: 16,
+        lineHeight: 17,
     },
 });
 

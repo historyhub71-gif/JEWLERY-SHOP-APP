@@ -98,10 +98,20 @@ const SplashScreen = ({ navigation }: Props) => {
             ]).start();
 
             setTimeout(() => {
-                navigation.replace('Registration');
+                navigation.replace('Login');
             }, 3500);
         });
-    }, [navigation]);
+    }, [
+        navigation,
+        glowOpacity,
+        loaderOpacity,
+        loaderScale,
+        logoOpacity,
+        logoScale,
+        shimmerPosition,
+        subtitleOpacity,
+        subtitleTranslate,
+    ]);
 
     const shimmerTranslate = shimmerPosition.interpolate({
         inputRange: [-1, 1],

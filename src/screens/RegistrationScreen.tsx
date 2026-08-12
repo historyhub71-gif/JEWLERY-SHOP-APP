@@ -28,47 +28,171 @@ const RegistrationScreen = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleRegister = async () => {
-        if (
-            !fullName.trim() ||
-            !phone.trim() ||
-            !email.trim() ||
-            !password ||
-            !confirmPassword ||
-            !city.trim() ||
-            !address.trim()
-        ) {
+        if (!fullName.trim()) {
             await SweetAlert.showAlert({
                 style: 'warning',
-                title: 'Missing Information',
-                subTitle: 'Please fill all fields.',
-                confirmButtonTitle: 'OK',
-            });
-            return;
-        }
-
-        if (password !== confirmPassword) {
-            await SweetAlert.showAlert({
-                style: 'error',
-                title: 'Password Error',
-                subTitle: 'Passwords do not match.',
+                title: 'Full Name Required',
+                subTitle: 'Please enter your full name.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
-
             return;
         }
 
-        if (password.length < 6) {
+        const phoneRegex = /^(03\d{9}|\+923\d{9}|923\d{9})$/;
+
+        if (!phone.trim()) {
             await SweetAlert.showAlert({
-                style: 'error',
-                title: 'Password Error',
-                subTitle: 'Password must be at least 6 characters.',
+                style: 'warning',
+                title: 'Phone Number Required',
+                subTitle: 'Please enter your phone number.',
                 confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
             });
             return;
         }
 
+        if (!phoneRegex.test(phone.trim())) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Invalid Phone Number',
+                subTitle:
+                    'Please enter a valid Pakistani phone number. Example: 03001234567 or +923001234567',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+        if (!email.trim()) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Email Required',
+                subTitle: 'Please enter your email address.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
 
+        const emailRegex =
+            /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+        if (!emailRegex.test(email.trim())) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Invalid Email',
+                subTitle: 'Please enter a valid email address.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+        if (!password) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Password Required',
+                subTitle: 'Please enter a password.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 1. Minimum 8 characters
+        if (password.length < 8) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Password Too Short',
+                subTitle: 'Your password must contain at least 8 characters.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 2. At least one uppercase letter
+        if (!/[A-Z]/.test(password)) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Uppercase Letter Required',
+                subTitle: 'Please add at least one uppercase letter (A-Z).',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 3. At least one number
+        if (!/[0-9]/.test(password)) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Number Required',
+                subTitle: 'Please add at least one number (0-9).',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 4. At least one special character
+        if (!/[@$!%*?&]/.test(password)) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Special Character Required',
+                subTitle:
+                    'Please add at least one special character such as @, $, !, %, *, ?, or &.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 5. Confirm password must not be empty
+        if (!confirmPassword) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Confirm Password Required',
+                subTitle: 'Please enter your password again.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        // 6. Passwords must match
+        if (password !== confirmPassword) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Passwords Do Not Match',
+                subTitle:
+                    'Your password and confirm password must be exactly the same.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        if (!city.trim()) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'City Required',
+                subTitle: 'Please enter your city.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        if (!address.trim()) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Address Required',
+                subTitle: 'Please enter your address.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
 
         try {
             setLoading(true);
@@ -103,10 +227,13 @@ const RegistrationScreen = () => {
                 throw profileError;
             }
 
-            Alert.alert(
-                'Registration Successful',
-                'Your registration has been submitted. Please wait for admin approval.',
-            );
+            await SweetAlert.showAlert({
+                style: 'success',
+                title: 'Registration Successful',
+                subTitle: 'Your registration has been submitted. Please wait for admin approval.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
 
             setFullName('');
             setPhone('');
@@ -116,10 +243,13 @@ const RegistrationScreen = () => {
             setCity('');
             setAddress('');
         } catch (error: any) {
-            Alert.alert(
-                'Registration Failed',
-                error?.message || 'Something went wrong.',
-            );
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Registration Failed',
+                subTitle: error?.message || 'Something went wrong.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
         } finally {
             setLoading(false);
         }
@@ -197,6 +327,7 @@ const RegistrationScreen = () => {
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            autoCorrect={false}
                         />
                     </View>
 
@@ -374,21 +505,21 @@ const styles = StyleSheet.create({
 
     sectionTitle: {
         color: '#D4AF37',
-        fontSize: 11,
+        fontSize: 20,
         fontWeight: '700',
         letterSpacing: 1.8,
-        marginBottom: 18,
+        marginBottom: 9,
     },
 
     securityTitle: {
-        marginTop: 2,
+        marginTop: 15,
     },
 
     label: {
         color: '#CFCFCF',
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: '600',
-        marginBottom: 1,
+        marginBottom: 3,
     },
 
     inputWrapper: {
@@ -405,8 +536,8 @@ const styles = StyleSheet.create({
 
     inputIcon: {
         width: 27,
-        color: '#D4AF37',
-        fontSize: 16,
+        color: '#ffd95dff',
+        fontSize: 18,
     },
 
     input: {
@@ -446,7 +577,7 @@ const styles = StyleSheet.create({
 
     eyeIcon: {
         color: '#D4AF37',
-        fontSize: 17,
+        fontSize: 13,
     },
     registerButton: {
         height: 56,

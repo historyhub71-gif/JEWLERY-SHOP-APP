@@ -1,7 +1,6 @@
 import SweetAlert from 'react-native-sweet-alert';
 import React, { useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -82,6 +81,26 @@ const RegistrationScreen = () => {
                 style: 'error',
                 title: 'Invalid Email',
                 subTitle: 'Please enter a valid email address.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+        if (city === '') {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'City Required',
+                subTitle: 'Please select your city.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+        if (address === '') {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Address Required',
+                subTitle: 'Please enter your address.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });

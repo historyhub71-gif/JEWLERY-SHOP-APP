@@ -1,16 +1,11 @@
 import React from 'react';
-import {
-    NavigationContainer,
-} from '@react-navigation/native';
-import DrawerNavigator from './DrawerNavigator';
-import {
-    createNativeStackNavigator,
-} from '@react-navigation/native-stack';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegistrationScreen from '../screens/RegistrationScreen';
-import HomeScreen from '../screens/homescreen';
+import DrawerNavigator from './DrawerNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -37,12 +32,9 @@ const AppNavigator = () => {
                     name="Registration"
                     component={RegistrationScreen}
                 />
+
                 <Stack.Screen
                     name="Home"
-                    component={HomeScreen}
-                />
-                <Stack.Screen
-                    name="Drawer"
                     component={DrawerNavigator}
                 />
             </Stack.Navigator>

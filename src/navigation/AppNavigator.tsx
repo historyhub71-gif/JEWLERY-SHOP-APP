@@ -2,7 +2,7 @@ import React from 'react';
 import {
     NavigationContainer,
 } from '@react-navigation/native';
-import DrawerNavigator from './DrawerNavigator';
+
 import {
     createNativeStackNavigator,
 } from '@react-navigation/native-stack';
@@ -40,10 +40,6 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="Home"
                     component={HomeScreen}
-                />
-                <Stack.Screen
-                    name="Drawer"
-                    component={DrawerNavigator}
                 />
             </Stack.Navigator>
         </NavigationContainer>

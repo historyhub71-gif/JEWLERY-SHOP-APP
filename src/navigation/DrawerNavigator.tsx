@@ -1,5 +1,10 @@
 import React from 'react';
 import {
+    View,
+    Text,
+    StyleSheet,
+} from 'react-native';
+import {
     createDrawerNavigator,
     DrawerContentScrollView,
     DrawerItemList,
@@ -16,40 +21,33 @@ import SettingsScreen from '../screens/SettingsScreen';
 const Drawer = createDrawerNavigator();
 
 const CustomDrawerContent = (props: any) => {
-    const handleLogout = () => {
-        SweetAlert.showAlertWithOptions(
-            {
-                title: 'Logout',
-                subTitle: 'Are you sure you want to logout?',
-                confirmButtonTitle: 'Logout',
-                confirmButtonColor: '#D4AF37',
-                otherButtonTitle: 'Cancel',
-                otherButtonColor: '#333333',
-                style: 'warning',
-                cancellable: true,
-            },
-            async (confirmed) => {
-                if (!confirmed) return;
+    const handleLogout = async () => {
+        const result = await SweetAlert.showAlert({
+            title: 'Logout',
+            subTitle: 'Are you sure you want to logout?',
+            confirmButtonTitle: 'Logout',
+            confirmButtonColor: '#D4AF37',
+            style: 'warning',
+        });
+        
+        if (!result) {
+            return;
+        }
+        
+        try {
+            const { error } = await supabase.auth.signOut();
 
-                try {
-                    const { error } = await supabase.auth.signOut();
+            if (error) throw error;
 
-                    if (error) throw error;
-
-                    props.navigation.replace('Login');
-                } catch (error: any) {
-                    SweetAlert.showAlertWithOptions(
-                        {
-                            title: 'Error',
-                            subTitle: error.message,
-                            confirmButtonTitle: 'OK',
-                            style: 'error',
-                        },
-                        () => {}
-                    );
-                }
-            }
-        );
+            props.navigation.replace('Login');
+        } catch (error: any) {
+            await SweetAlert.showAlert({
+                title: 'Error',
+                subTitle: error.message,
+                confirmButtonTitle: 'OK',
+                style: 'error',
+            });
+        }
     };
 
     return (

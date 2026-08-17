@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -10,8 +11,27 @@ import DrawerNavigator from './DrawerNavigator';
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
+    const handleNavigationStateChange = (state: any) => {
+        // Track navigation state
+        if (!state) {
+            console.log('Navigation state is null');
+        }
+    };
+
+    const handleNavigationReady = () => {
+        console.log('Navigation ready');
+    };
+
     return (
-        <NavigationContainer>
+        <NavigationContainer
+            onStateChange={handleNavigationStateChange}
+            onReady={handleNavigationReady}
+            fallback={
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                    <Text style={{ color: '#fff' }}>Loading...</Text>
+                </View>
+            }
+        >
             <Stack.Navigator
                 initialRouteName="Splash"
                 screenOptions={{
@@ -21,6 +41,9 @@ const AppNavigator = () => {
                 <Stack.Screen
                     name="Splash"
                     component={SplashScreen}
+                    options={{
+                        animationTypeForReplace: 'pop',
+                    }}
                 />
 
                 <Stack.Screen

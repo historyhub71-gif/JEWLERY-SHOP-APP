@@ -22,6 +22,7 @@ const SplashScreen = ({ navigation }: Props) => {
     const loaderScale = useRef(new Animated.Value(0.5)).current;
 
     useEffect(() => {
+        // Start animations
         Animated.timing(glowOpacity, {
             toValue: 1,
             duration: 700,
@@ -97,9 +98,17 @@ const SplashScreen = ({ navigation }: Props) => {
                 }),
             ]).start();
 
-            setTimeout(() => {
-                navigation.replace('Login');
+            // Navigate after delay
+            const timer = setTimeout(() => {
+                try {
+                    console.log('Navigating to Login');
+                    navigation.replace('Login');
+                } catch (error) {
+                    console.error('Navigation error:', error);
+                }
             }, 3500);
+
+            return () => clearTimeout(timer);
         });
     }, [
         navigation,

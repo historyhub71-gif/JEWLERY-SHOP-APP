@@ -84,7 +84,54 @@ const LoginScreen = ({ navigation }: any) => {
                 confirmButtonColor: '#D4AF37',
             });
 
-            navigation.replace('Home');
+            const {
+    data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+    throw new Error('Unable to get logged-in user.');
+}
+
+const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, status')
+    .eq('id', user.id)
+    .single();
+
+if (profileError || !profile) {
+    throw new Error('Your profile could not be found.');
+}
+
+if (profile.status !== 'approved') {
+    await supabase.auth.signOut();
+
+    await SweetAlert.showAlert({
+        style: 'warning',
+        title: 'Account Not Approved',
+        subTitle: 'Your GoldKing account is not approved yet.',
+        confirmButtonTitle: 'OK',
+        confirmButtonColor: '#D4AF37',
+    });
+
+    return;
+}
+
+if (profile.role === 'super_admin') {
+    navigation.replace('Home');
+    return;
+}
+
+if (profile.role === 'admin') {
+    navigation.replace('Home');
+    return;
+}
+
+if (profile.role === 'customer') {
+    navigation.replace('Home');
+    return;
+}
+
+throw new Error('Invalid account role.');
         } catch (error: any) {
             await SweetAlert.showAlert({
                 style: 'error',

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
     Animated,
     Easing,
@@ -13,6 +14,7 @@ type Props = {
 
 const SplashScreen = ({ navigation }: Props) => {
     const logoOpacity = useRef(new Animated.Value(0)).current;
+    const { session, profile, loading } = useAuth();
     const logoScale = useRef(new Animated.Value(0.75)).current;
     const glowOpacity = useRef(new Animated.Value(0)).current;
     const shimmerPosition = useRef(new Animated.Value(-1)).current;
@@ -100,27 +102,73 @@ const SplashScreen = ({ navigation }: Props) => {
 
             // Navigate after delay
             const timer = setTimeout(() => {
-                try {
-                    console.log('Navigating to Login');
-                    navigation.replace('Login');
-                } catch (error) {
-                    console.error('Navigation error:', error);
-                }
-            }, 3500);
+    try {
+        if (loading) {
+            return;
+        }
 
+        if (!session) {
+            console.log('No session → Login');
+            navigation.replace('Login');
+            return;
+        }
+
+        if (!profile) {
+            console.log('Session exists but profile not found');
+            navigation.replace('Login');
+            return;
+        }
+
+        if (
+            profile.role === 'super_admin' &&
+            profile.status === 'approved'
+        ) {
+            console.log('Super Admin → Home');
+            navigation.replace('Home');
+            return;
+        }
+
+        if (
+            profile.role === 'admin' &&
+            profile.status === 'approved'
+        ) {
+            console.log('Admin → Home');
+            navigation.replace('Home');
+            return;
+        }
+
+        if (
+            profile.role === 'customer' &&
+            profile.status === 'approved'
+        ) {
+            console.log('Customer → Home');
+            navigation.replace('Home');
+            return;
+        }
+
+        console.log('Account is not approved');
+        navigation.replace('Login');
+    } catch (error) {
+        console.error('Navigation error:', error);
+        navigation.replace('Login');
+    }
+}, 3500);
             return () => clearTimeout(timer);
         });
     }, [
-        navigation,
-        glowOpacity,
-        loaderOpacity,
-        loaderScale,
-        logoOpacity,
-        logoScale,
-        shimmerPosition,
-        subtitleOpacity,
-        subtitleTranslate,
-    ]);
+    navigation,
+    glowOpacity,
+    loaderOpacity,
+    loaderScale,
+    logoOpacity,
+    logoScale,
+    shimmerPosition,
+    subtitleOpacity,
+    subtitleTranslate,
+    session,
+    profile,
+    loading,
+]);
 
     const shimmerTranslate = shimmerPosition.interpolate({
         inputRange: [-1, 1],

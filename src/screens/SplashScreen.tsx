@@ -102,10 +102,10 @@ const SplashScreen = ({ navigation }: Props) => {
 
             // Navigate after delay
             const timer = setTimeout(() => {
-    try {
-        if (loading) {
-            return;
-        }
+         try {
+         if (loading) {
+             return;
+       }
 
         if (!session) {
             console.log('No session → Login');

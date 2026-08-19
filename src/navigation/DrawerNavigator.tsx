@@ -1,16 +1,12 @@
 import React from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
+import {View,Text,StyleSheet,
 } from 'react-native';
-import {
-    createDrawerNavigator,
-    DrawerContentScrollView,
-    DrawerItemList,
-    DrawerItem,
+import {createDrawerNavigator,DrawerContentScrollView,DrawerItemList,  DrawerItem,
 } from '@react-navigation/drawer';
+import SuperAdminScreen from '../screens/SuperAdminScreen';
+import AdminManagementScreen from '../screens/AdminManagementScreen';
 import SweetAlert from 'react-native-sweet-alert';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
 import HomeScreen from '../screens/homescreen';
@@ -72,6 +68,8 @@ const CustomDrawerContent = (props: any) => {
 };
 
 const DrawerNavigator = () => {
+    const { profile } = useAuth();
+const isSuperAdmin = profile?.role === 'super_admin';
     return (
         <Drawer.Navigator
             drawerContent={(props) => <CustomDrawerContent {...props} />}
@@ -89,6 +87,9 @@ const DrawerNavigator = () => {
                 },
             }}
         >
+            {isSuperAdmin && (
+            <Drawer.Screen name="Super Admin" component={SuperAdminScreen}/>)}
+            <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
             <Drawer.Screen name="Home" component={HomeScreen} />
             <Drawer.Screen name="Profile" component={ProfileScreen} />
             <Drawer.Screen name="Notifications" component={NotificationsScreen} />

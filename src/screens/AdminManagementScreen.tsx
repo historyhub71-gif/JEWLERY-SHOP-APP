@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -26,6 +26,45 @@ const AdminManagementScreen = ({ navigation }: any) => {
     const [password, setPassword] = useState('');
 
     const [loading, setLoading] = useState(false);
+    const [admins, setAdmins] = useState<any[]>([]);
+    const [loadingAdmins, setLoadingAdmins] = useState(false);
+
+    const loadAdmins = async () => {
+    setLoadingAdmins(true);
+
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select(
+                'id, full_name, email, phone, city, address, status, role'
+            )
+            .eq('role', 'admin')
+            .order('full_name', { ascending: true });
+
+        if (error) {
+            throw error;
+        }
+
+        setAdmins(data || []);
+    } catch (error: any) {
+        console.error('LOAD ADMINS ERROR:', error);
+
+        await SweetAlert.showAlert({
+            style: 'error',
+            title: 'Unable to Load Admins',
+            subTitle:
+                error?.message ||
+                'Could not load administrators.',
+            confirmButtonTitle: 'OK',
+            confirmButtonColor: '#D4AF37',
+        });
+    } finally {
+        setLoadingAdmins(false);
+    }
+};
+useEffect(() => {
+    loadAdmins();
+}, []);
 
     const handleCreateAdmin = async () => {
         if (!fullName.trim()) {
@@ -125,15 +164,17 @@ await SweetAlert.showAlert({
     subTitle: 'The new admin account has been created successfully.',
     confirmButtonTitle: 'OK',
     confirmButtonColor: '#D4AF37',
-});
+      });
 
-setFullName('');
-setEmail('');
-setPhone('');
-setCity('');
-setAddress('');
-setPassword('');
-setShowForm(false);
+         setFullName('');
+         setEmail('');
+         setPhone('');
+         setCity('');
+         setAddress('');
+         setPassword('');
+         setShowForm(false);
+
+         await loadAdmins();
         } catch (error: any) {
             await SweetAlert.showAlert({
                 style: 'error',
@@ -149,8 +190,8 @@ setShowForm(false);
         }
     };
 
-    if (!showForm) {
-        return (
+       if (!showForm) {
+         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity
@@ -170,20 +211,140 @@ setShowForm(false);
                     </View>
                 </View>
 
-                <View style={styles.content}>
-                    <Text style={styles.heading}>
-                        Administrators
-                    </Text>
+                <ScrollView
+    style={styles.content}
+    showsVerticalScrollIndicator={false}
+>
+    <View style={styles.sectionHeader}>
+        <View>
+            <Text style={styles.heading}>
+                Administrators
+            </Text>
 
-                    <TouchableOpacity
-                        style={styles.addButton}
-                        onPress={() => setShowForm(true)}
-                    >
-                        <Text style={styles.addButtonText}>
-                            + CREATE ADMIN
-                        </Text>
-                    </TouchableOpacity>
+            <Text style={styles.countText}>
+                {admins.length} administrators
+            </Text>
+        </View>
+
+        <View style={styles.totalBadge}>
+            <Text style={styles.totalBadgeText}>
+                {admins.length}
+            </Text>
+        </View>
+    </View>
+    {loadingAdmins ? (
+    <View style={styles.loadingContainer}>
+        <ActivityIndicator
+            size="large"
+            color="#D4AF37"
+        />
+
+        <Text style={styles.loadingText}>
+            Loading administrators...
+        </Text>
+    </View>
+) : admins.length === 0 ? (
+    <View style={styles.emptyContainer}>
+        <Text style={styles.emptyTitle}>
+            No Administrators
+        </Text>
+
+        <Text style={styles.emptyText}>
+            No admin accounts have been created yet.
+        </Text>
+    </View>
+) : (
+    <>
+    {admins.map((admin: any) => (
+        <View
+            key={admin.id}
+            style={styles.adminCard}
+        >
+            <View style={styles.adminHeader}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                        {admin.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                    </Text>
                 </View>
+
+                <View style={styles.adminInfo}>
+                    <Text style={styles.adminName}>
+                     {admin.full_name || 'Unnamed Admin'}
+                     </Text>
+
+                    <Text style={styles.adminEmail}>
+                        {admin.email}
+                    </Text>
+                </View>
+
+                <View style={styles.statusBadge}>
+                    <Text style={styles.statusText}>
+                        ● {admin.status}
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <Text style={styles.adminDetail}>
+                📞 {admin.phone}
+            </Text>
+
+            <Text style={styles.adminDetail}>
+                📍 {admin.city}
+            </Text>
+
+            <View style={styles.actionRow}>
+                <TouchableOpacity
+                    style={styles.viewButton}
+                    onPress={() =>
+                        SweetAlert.showAlert({
+                            style: 'normal',
+                            title: admin.full_name || 'Unnamed Admin',
+                            subTitle:
+                                `${admin.email}\n${admin.phone}\n${admin.city}`,
+                            confirmButtonTitle: 'OK',
+                            confirmButtonColor: '#D4AF37',
+                        })
+                    }
+                >
+                    <Text style={styles.viewButtonText}>
+                        VIEW
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() =>
+                        SweetAlert.showAlert({
+                            style: 'normal',
+                            title: 'Edit Admin',
+                            subTitle:
+                                'Admin editing will be connected later.',
+                            confirmButtonTitle: 'OK',
+                            confirmButtonColor: '#D4AF37',
+                        })
+                    }
+                >
+                    <Text style={styles.editButtonText}>
+                        EDIT
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    ))}
+    </>
+)}
+
+    <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setShowForm(true)}
+    >
+        <Text style={styles.addButtonText}>
+            + CREATE ADMIN
+        </Text>
+    </TouchableOpacity>
+        </ScrollView>
             </SafeAreaView>
         );
     }
@@ -326,6 +487,36 @@ setShowForm(false);
 };
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+},
+
+loadingText: {
+    color: '#888888',
+    fontSize: 14,
+    marginTop: 12,
+},
+
+emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+},
+
+emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+},
+
+emptyText: {
+    color: '#777777',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
+},
     flex: {
         flex: 1,
     },
@@ -443,6 +634,142 @@ const styles = StyleSheet.create({
     disabledButton: {
         opacity: 0.6,
     },
+    sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+},
+
+countText: {
+    color: '#777777',
+    fontSize: 13,
+    marginTop: 5,
+},
+
+totalBadge: {
+    width: 45,
+    height: 45,
+    borderRadius: 23,
+    backgroundColor: '#D4AF37',
+    justifyContent: 'center',
+    alignItems: 'center',
+},
+
+totalBadgeText: {
+    color: '#111111',
+    fontSize: 18,
+    fontWeight: '800',
+},
+
+adminCard: {
+    backgroundColor: '#181818',
+    borderWidth: 1,
+    borderColor: '#2D2D2D',
+    borderRadius: 15,
+    padding: 16,
+    marginBottom: 15,
+},
+
+adminHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+},
+
+avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#D4AF37',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+},
+
+avatarText: {
+    color: '#111111',
+    fontSize: 20,
+    fontWeight: '800',
+},
+
+adminInfo: {
+    flex: 1,
+},
+
+adminName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+},
+
+adminEmail: {
+    color: '#777777',
+    fontSize: 11,
+    marginTop: 4,
+},
+
+statusBadge: {
+    backgroundColor: '#17301F',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+},
+
+statusText: {
+    color: '#55C878',
+    fontSize: 10,
+    fontWeight: '700',
+},
+
+divider: {
+    height: 1,
+    backgroundColor: '#292929',
+    marginVertical: 14,
+},
+
+adminDetail: {
+    color: '#BBBBBB',
+    fontSize: 13,
+    marginBottom: 8,
+},
+
+actionRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+},
+
+viewButton: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#D4AF37',
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 5,
+},
+
+viewButtonText: {
+    color: '#D4AF37',
+    fontSize: 12,
+    fontWeight: '800',
+},
+
+editButton: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#D4AF37',
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 5,
+},
+
+editButtonText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '800',
+},
 });
 
 export default AdminManagementScreen;

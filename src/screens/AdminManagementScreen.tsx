@@ -17,7 +17,7 @@ import { supabase } from '../lib/supabase';
 
 const AdminManagementScreen = ({ navigation }: any) => {
     const [showForm, setShowForm] = useState(false);
-
+    const [shopName, setShopName] = useState('');
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
@@ -65,8 +65,58 @@ const AdminManagementScreen = ({ navigation }: any) => {
 useEffect(() => {
     loadAdmins();
 }, []);
+useEffect(() => {
+    loadAdmins();
+}, []);
 
+const handleExitCreateAdmin = async () => {
+    const hasChanges =
+        shopName.trim() !== '' ||
+        fullName.trim() !== '' ||
+        email.trim() !== '' ||
+        phone.trim() !== '' ||
+        city.trim() !== '' ||
+        address.trim() !== '' ||
+        password !== '';
+
+    if (!hasChanges) {
+        setShowForm(false);
+        return;
+    }
+
+    const result = await SweetAlert.showAlert({
+        style: 'warning',
+        title: 'Discard Changes?',
+        subTitle:
+            'You have unsaved changes. Are you sure you want to discard them?',
+        confirmButtonTitle: 'DISCARD',
+        confirmButtonColor: '#D4AF37',
+    });
+
+    if (result) {
+        setShopName('');
+        setFullName('');
+        setEmail('');
+        setPhone('');
+        setCity('');
+        setAddress('');
+        setPassword('');
+
+        setShowForm(false);
+    }
+};
     const handleCreateAdmin = async () => {
+
+        if (!shopName.trim()) {
+             await SweetAlert.showAlert({
+              style: 'warning',
+          title: 'Shop Name Required',
+          subTitle: 'Please enter the shop name.',
+          confirmButtonTitle: 'OK',
+         confirmButtonColor: '#D4AF37',
+         }); 
+         return;
+ }   
         if (!fullName.trim()) {
             await SweetAlert.showAlert({
                 style: 'warning',
@@ -140,6 +190,7 @@ useEffect(() => {
     'create-admin',
     {
         body: {
+            shopName: shopName.trim(),
             fullName: fullName.trim(),
             email: email.trim(),
             phone: phone.trim(),
@@ -165,7 +216,7 @@ await SweetAlert.showAlert({
     confirmButtonTitle: 'OK',
     confirmButtonColor: '#D4AF37',
       });
-
+         setShopName('');
          setFullName('');
          setEmail('');
          setPhone('');
@@ -210,7 +261,7 @@ await SweetAlert.showAlert({
                         </Text>
                     </View>
                 </View>
-
+  <View style={styles.adminListContainer}></View>
                 <ScrollView
     style={styles.content}
     showsVerticalScrollIndicator={false}
@@ -335,7 +386,7 @@ await SweetAlert.showAlert({
     ))}
     </>
 )}
-
+   </ScrollView>
     <TouchableOpacity
         style={styles.addButton}
         onPress={() => setShowForm(true)}
@@ -344,7 +395,6 @@ await SweetAlert.showAlert({
             + CREATE ADMIN
         </Text>
     </TouchableOpacity>
-        </ScrollView>
             </SafeAreaView>
         );
     }
@@ -365,24 +415,34 @@ await SweetAlert.showAlert({
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.formHeader}>
-                        <TouchableOpacity
-                            onPress={() => setShowForm(false)}
-                        >
-                            <Text style={styles.backButton}>
-                                ←
-                            </Text>
-                        </TouchableOpacity>
+                     <TouchableOpacity 
+                  style={styles.backButtonContainer} 
+                 onPress={handleExitCreateAdmin}
+>
+               <Text style={styles.backButton}>
+                 ‹
+                </Text>
+             </TouchableOpacity>
 
-                        <View>
-                            <Text style={styles.title}>
-                                Create Admin
-                            </Text>
+          <View style={styles.formTitleContainer}>
+           <Text style={styles.title}>
+              Create Admin
+          </Text>
 
-                            <Text style={styles.subtitle}>
-                                Add a new GoldKing administrator
-                            </Text>
-                        </View>
-                    </View>
+          <Text style={styles.subtitle}>
+            Add a new GoldKing administrator
+            </Text>
+             </View>
+
+             <TouchableOpacity
+             style={styles.exitButton}
+             onPress={handleExitCreateAdmin}
+              >
+            <Text style={styles.exitButtonText}>
+              ✕
+             </Text>
+             </TouchableOpacity>
+                </View>
 
                     <Text style={styles.label}>
                         Full Name
@@ -395,6 +455,17 @@ await SweetAlert.showAlert({
                         value={fullName}
                         onChangeText={setFullName}
                     />
+                    <Text style={styles.label}>
+                      Shop Name
+                    </Text>
+
+                    <TextInput
+                    style={styles.input}
+                      placeholder="Enter shop name"
+                     placeholderTextColor="#777777"
+                     value={shopName}
+                      onChangeText={setShopName}
+                        />
 
                     <Text style={styles.label}>
                         Email
@@ -436,7 +507,7 @@ await SweetAlert.showAlert({
                     />
 
                     <Text style={styles.label}>
-                        Address
+                        Exact Address
                     </Text>
 
                     <TextInput
@@ -487,6 +558,9 @@ await SweetAlert.showAlert({
 };
 
 const styles = StyleSheet.create({
+    adminListContainer: {
+    flex: 1,
+   },
     loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -540,6 +614,36 @@ emptyText: {
         alignItems: 'center',
         marginBottom: 30,
     },
+    backButtonContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 21,
+    borderWidth: 0,
+    borderColor: '#D4AF37',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+},
+
+    formTitleContainer: {
+    flex: 1,
+    },
+
+  exitButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 21,
+    borderColor: '#555555',
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+},
+
+    exitButtonText: {
+    color: '#D4AF37',
+    fontSize: 20,
+    fontWeight: '700',
+        },
 
     menuButton: {
         color: '#D4AF37',
@@ -549,7 +653,7 @@ emptyText: {
 
     backButton: {
         color: '#D4AF37',
-        fontSize: 32,
+        fontSize: 42,
         marginRight: 18,
     },
 
@@ -562,7 +666,7 @@ emptyText: {
     subtitle: {
         color: '#888888',
         fontSize: 13,
-        marginTop: 4,
+        marginTop: 1,
     },
 
     content: {
@@ -578,14 +682,14 @@ emptyText: {
         color: '#FFFFFF',
         fontSize: 22,
         fontWeight: '700',
-        marginBottom: 20,
+        marginBottom: 1,
     },
 
     label: {
         color: '#D4AF37',
         fontSize: 14,
         fontWeight: '600',
-        marginBottom: 8,
+        marginBottom: 5,
     },
 
     input: {
@@ -601,12 +705,15 @@ emptyText: {
     },
 
     addButton: {
-        height: 55,
-        borderRadius: 12,
-        backgroundColor: '#D4AF37',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    height: 55,
+    borderRadius: 12,
+    backgroundColor: '#D4AF37',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 24,
+    marginTop: 10,
+    marginBottom: 15,
+},
 
     addButtonText: {
         color: '#111111',
@@ -644,12 +751,12 @@ emptyText: {
 countText: {
     color: '#777777',
     fontSize: 13,
-    marginTop: 5,
+
 },
 
 totalBadge: {
-    width: 45,
-    height: 45,
+    width: 35,
+    height: 35,
     borderRadius: 23,
     backgroundColor: '#D4AF37',
     justifyContent: 'center',
@@ -658,7 +765,7 @@ totalBadge: {
 
 totalBadgeText: {
     color: '#111111',
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '800',
 },
 
@@ -667,8 +774,8 @@ adminCard: {
     borderWidth: 1,
     borderColor: '#2D2D2D',
     borderRadius: 15,
-    padding: 16,
-    marginBottom: 15,
+    padding: 10,
+    marginBottom: 10,
 },
 
 adminHeader: {

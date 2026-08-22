@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
 
     // Read request body
     const {
+      shopName,
       fullName,
       email,
       phone,
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
 
     // Validate required fields
     if (
+      !shopName?.trim() ||
       !fullName?.trim() ||
       !email?.trim() ||
       !phone?.trim() ||
@@ -188,6 +190,7 @@ Deno.serve(async (req) => {
       .from("profiles")
       .insert({
         id: newAdminId,
+        shop_name: shopName.trim(),
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
@@ -225,6 +228,7 @@ Deno.serve(async (req) => {
         message: "Admin created successfully.",
         admin: {
           id: newAdminId,
+          shop_name: shopName.trim(),
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           role: "admin",

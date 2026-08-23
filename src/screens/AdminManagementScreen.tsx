@@ -30,93 +30,93 @@ const AdminManagementScreen = ({ navigation }: any) => {
     const [loadingAdmins, setLoadingAdmins] = useState(false);
 
     const loadAdmins = async () => {
-    setLoadingAdmins(true);
+        setLoadingAdmins(true);
 
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select(
-                'id, full_name, email, phone, city, address, status, role'
-            )
-            .eq('role', 'admin')
-            .order('full_name', { ascending: true });
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select(
+                    'id, full_name, email, phone, city, address,shop_name, status, role'
+                )
+                .eq('role', 'admin')
+                .order('full_name', { ascending: true });
 
-        if (error) {
-            throw error;
+            if (error) {
+                throw error;
+            }
+
+            setAdmins(data || []);
+        } catch (error: any) {
+            console.error('LOAD ADMINS ERROR:', error);
+
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Unable to Load Admins',
+                subTitle:
+                    error?.message ||
+                    'Could not load administrators.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+        } finally {
+            setLoadingAdmins(false);
+        }
+    };
+    useEffect(() => {
+        loadAdmins();
+    }, []);
+    useEffect(() => {
+        loadAdmins();
+    }, []);
+
+    const handleExitCreateAdmin = async () => {
+        const hasChanges =
+            shopName.trim() !== '' ||
+            fullName.trim() !== '' ||
+            email.trim() !== '' ||
+            phone.trim() !== '' ||
+            city.trim() !== '' ||
+            address.trim() !== '' ||
+            password !== '';
+
+        if (!hasChanges) {
+            setShowForm(false);
+            return;
         }
 
-        setAdmins(data || []);
-    } catch (error: any) {
-        console.error('LOAD ADMINS ERROR:', error);
-
-        await SweetAlert.showAlert({
-            style: 'error',
-            title: 'Unable to Load Admins',
+        const result = await SweetAlert.showAlert({
+            style: 'warning',
+            title: 'Discard Changes?',
             subTitle:
-                error?.message ||
-                'Could not load administrators.',
-            confirmButtonTitle: 'OK',
+                'You have unsaved changes. Are you sure you want to discard them?',
+            confirmButtonTitle: 'DISCARD',
             confirmButtonColor: '#D4AF37',
         });
-    } finally {
-        setLoadingAdmins(false);
-    }
-};
-useEffect(() => {
-    loadAdmins();
-}, []);
-useEffect(() => {
-    loadAdmins();
-}, []);
 
-const handleExitCreateAdmin = async () => {
-    const hasChanges =
-        shopName.trim() !== '' ||
-        fullName.trim() !== '' ||
-        email.trim() !== '' ||
-        phone.trim() !== '' ||
-        city.trim() !== '' ||
-        address.trim() !== '' ||
-        password !== '';
+        if (result) {
+            setShopName('');
+            setFullName('');
+            setEmail('');
+            setPhone('');
+            setCity('');
+            setAddress('');
+            setPassword('');
 
-    if (!hasChanges) {
-        setShowForm(false);
-        return;
-    }
-
-    const result = await SweetAlert.showAlert({
-        style: 'warning',
-        title: 'Discard Changes?',
-        subTitle:
-            'You have unsaved changes. Are you sure you want to discard them?',
-        confirmButtonTitle: 'DISCARD',
-        confirmButtonColor: '#D4AF37',
-    });
-
-    if (result) {
-        setShopName('');
-        setFullName('');
-        setEmail('');
-        setPhone('');
-        setCity('');
-        setAddress('');
-        setPassword('');
-
-        setShowForm(false);
-    }
-};
+            setShowForm(false);
+        }
+    };
     const handleCreateAdmin = async () => {
 
         if (!shopName.trim()) {
-             await SweetAlert.showAlert({
-              style: 'warning',
-          title: 'Shop Name Required',
-          subTitle: 'Please enter the shop name.',
-          confirmButtonTitle: 'OK',
-         confirmButtonColor: '#D4AF37',
-         }); 
-         return;
- }   
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Shop Name Required',
+                subTitle: 'Please enter the shop name.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
         if (!fullName.trim()) {
             await SweetAlert.showAlert({
                 style: 'warning',
@@ -186,46 +186,46 @@ const handleExitCreateAdmin = async () => {
         setLoading(true);
 
         try {
-           const { data, error } = await supabase.functions.invoke(
-    'create-admin',
-    {
-        body: {
-            shopName: shopName.trim(),
-            fullName: fullName.trim(),
-            email: email.trim(),
-            phone: phone.trim(),
-            city: city.trim(),
-            address: address.trim(),
-            password,
-        },
-    }
-);
+            const { data, error } = await supabase.functions.invoke(
+                'create-admin',
+                {
+                    body: {
+                        shopName: shopName.trim(),
+                        fullName: fullName.trim(),
+                        email: email.trim(),
+                        phone: phone.trim(),
+                        city: city.trim(),
+                        address: address.trim(),
+                        password,
+                    },
+                }
+            );
 
-if (error) {
-    throw new Error(error.message || 'Failed to create admin.');
-}
+            if (error) {
+                throw new Error(error.message || 'Failed to create admin.');
+            }
 
-if (!data?.success) {
-    throw new Error(data?.error || 'Failed to create admin.');
-}
+            if (!data?.success) {
+                throw new Error(data?.error || 'Failed to create admin.');
+            }
 
-await SweetAlert.showAlert({
-    style: 'success',
-    title: 'Admin Created',
-    subTitle: 'The new admin account has been created successfully.',
-    confirmButtonTitle: 'OK',
-    confirmButtonColor: '#D4AF37',
-      });
-         setShopName('');
-         setFullName('');
-         setEmail('');
-         setPhone('');
-         setCity('');
-         setAddress('');
-         setPassword('');
-         setShowForm(false);
+            await SweetAlert.showAlert({
+                style: 'success',
+                title: 'Admin Created',
+                subTitle: 'The new admin account has been created successfully.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            setShopName('');
+            setFullName('');
+            setEmail('');
+            setPhone('');
+            setCity('');
+            setAddress('');
+            setPassword('');
+            setShowForm(false);
 
-         await loadAdmins();
+            await loadAdmins();
         } catch (error: any) {
             await SweetAlert.showAlert({
                 style: 'error',
@@ -241,8 +241,8 @@ await SweetAlert.showAlert({
         }
     };
 
-       if (!showForm) {
-         return (
+    if (!showForm) {
+        return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
                     <TouchableOpacity
@@ -261,140 +261,143 @@ await SweetAlert.showAlert({
                         </Text>
                     </View>
                 </View>
-  <View style={styles.adminListContainer}></View>
+                <View style={styles.adminListContainer}></View>
                 <ScrollView
-    style={styles.content}
-    showsVerticalScrollIndicator={false}
->
-    <View style={styles.sectionHeader}>
-        <View>
-            <Text style={styles.heading}>
-                Administrators
-            </Text>
-
-            <Text style={styles.countText}>
-                {admins.length} administrators
-            </Text>
-        </View>
-
-        <View style={styles.totalBadge}>
-            <Text style={styles.totalBadgeText}>
-                {admins.length}
-            </Text>
-        </View>
-    </View>
-    {loadingAdmins ? (
-    <View style={styles.loadingContainer}>
-        <ActivityIndicator
-            size="large"
-            color="#D4AF37"
-        />
-
-        <Text style={styles.loadingText}>
-            Loading administrators...
-        </Text>
-    </View>
-) : admins.length === 0 ? (
-    <View style={styles.emptyContainer}>
-        <Text style={styles.emptyTitle}>
-            No Administrators
-        </Text>
-
-        <Text style={styles.emptyText}>
-            No admin accounts have been created yet.
-        </Text>
-    </View>
-) : (
-    <>
-    {admins.map((admin: any) => (
-        <View
-            key={admin.id}
-            style={styles.adminCard}
-        >
-            <View style={styles.adminHeader}>
-                <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                        {admin.full_name?.charAt(0)?.toUpperCase() || 'A'}
-                    </Text>
-                </View>
-
-                <View style={styles.adminInfo}>
-                    <Text style={styles.adminName}>
-                     {admin.full_name || 'Unnamed Admin'}
-                     </Text>
-
-                    <Text style={styles.adminEmail}>
-                        {admin.email}
-                    </Text>
-                </View>
-
-                <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>
-                        ● {admin.status}
-                    </Text>
-                </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <Text style={styles.adminDetail}>
-                📞 {admin.phone}
-            </Text>
-
-            <Text style={styles.adminDetail}>
-                📍 {admin.city}
-            </Text>
-
-            <View style={styles.actionRow}>
-                <TouchableOpacity
-                    style={styles.viewButton}
-                    onPress={() =>
-                        SweetAlert.showAlert({
-                            style: 'normal',
-                            title: admin.full_name || 'Unnamed Admin',
-                            subTitle:
-                                `${admin.email}\n${admin.phone}\n${admin.city}`,
-                            confirmButtonTitle: 'OK',
-                            confirmButtonColor: '#D4AF37',
-                        })
-                    }
+                    style={styles.content}
+                    showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.viewButtonText}>
-                        VIEW
+                    <View style={styles.sectionHeader}>
+                        <View>
+                            <Text style={styles.heading}>
+                                Administrators
+                            </Text>
+
+                            <Text style={styles.countText}>
+                                {admins.length} administrators
+                            </Text>
+                        </View>
+
+                        <View style={styles.totalBadge}>
+                            <Text style={styles.totalBadgeText}>
+                                {admins.length}
+                            </Text>
+                        </View>
+                    </View>
+                    {loadingAdmins ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator
+                                size="large"
+                                color="#D4AF37"
+                            />
+
+                            <Text style={styles.loadingText}>
+                                Loading administrators...
+                            </Text>
+                        </View>
+                    ) : admins.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyTitle}>
+                                No Administrators
+                            </Text>
+
+                            <Text style={styles.emptyText}>
+                                No admin accounts have been created yet.
+                            </Text>
+                        </View>
+                    ) : (
+                        <>
+                            {admins.map((admin: any) => (
+                                <View
+                                    key={admin.id}
+                                    style={styles.adminCard}
+                                >
+                                    <View style={styles.adminHeader}>
+                                        <View style={styles.avatar}>
+                                            <Text style={styles.avatarText}>
+                                                {admin.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                                            </Text>
+                                        </View>
+
+                                        <View style={styles.adminInfo}>
+                                            <Text style={styles.adminName}>
+                                                {admin.full_name || 'Unnamed Admin'}
+                                            </Text>
+                                            <Text style={styles.adminShop}>
+                                                🏪 {admin.shop_name || 'No Shop Name'}
+                                            </Text>
+
+                                            <Text style={styles.adminEmail}>
+                                                {admin.email}
+                                            </Text>
+                                        </View>
+
+                                        <View style={styles.statusBadge}>
+                                            <Text style={styles.statusText}>
+                                                ● {admin.status}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.divider} />
+
+                                    <Text style={styles.adminDetail}>
+                                        📞 {admin.phone}
+                                    </Text>
+
+                                    <Text style={styles.adminDetail}>
+                                        📍 {admin.city}
+                                    </Text>
+
+                                    <View style={styles.actionRow}>
+                                        <TouchableOpacity
+                                            style={styles.viewButton}
+                                            onPress={() =>
+                                                SweetAlert.showAlert({
+                                                    style: 'normal',
+                                                    title: admin.full_name || 'Unnamed Admin',
+                                                    subTitle:
+                                                        `${admin.email}\n${admin.phone}\n${admin.city}`,
+                                                    confirmButtonTitle: 'OK',
+                                                    confirmButtonColor: '#D4AF37',
+                                                })
+                                            }
+                                        >
+                                            <Text style={styles.viewButtonText}>
+                                                VIEW
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.editButton}
+                                            onPress={() =>
+                                                SweetAlert.showAlert({
+                                                    style: 'normal',
+                                                    title: 'Edit Admin',
+                                                    subTitle:
+                                                        'Admin editing will be connected later.',
+                                                    confirmButtonTitle: 'OK',
+                                                    confirmButtonColor: '#D4AF37',
+                                                })
+                                            }
+                                        >
+                                            <Text style={styles.editButtonText}>
+                                                EDIT
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            ))}
+                        </>
+                    )}
+                </ScrollView>
+                <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => setShowForm(true)}
+                >
+                    <Text style={styles.addButtonText}>
+                        + CREATE ADMIN
                     </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() =>
-                        SweetAlert.showAlert({
-                            style: 'normal',
-                            title: 'Edit Admin',
-                            subTitle:
-                                'Admin editing will be connected later.',
-                            confirmButtonTitle: 'OK',
-                            confirmButtonColor: '#D4AF37',
-                        })
-                    }
-                >
-                    <Text style={styles.editButtonText}>
-                        EDIT
-                    </Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    ))}
-    </>
-)}
-   </ScrollView>
-    <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setShowForm(true)}
-    >
-        <Text style={styles.addButtonText}>
-            + CREATE ADMIN
-        </Text>
-    </TouchableOpacity>
             </SafeAreaView>
         );
     }
@@ -415,34 +418,34 @@ await SweetAlert.showAlert({
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.formHeader}>
-                     <TouchableOpacity 
-                  style={styles.backButtonContainer} 
-                 onPress={handleExitCreateAdmin}
->
-               <Text style={styles.backButton}>
-                 ‹
-                </Text>
-             </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.backButtonContainer}
+                            onPress={handleExitCreateAdmin}
+                        >
+                            <Text style={styles.backButton}>
+                                ‹
+                            </Text>
+                        </TouchableOpacity>
 
-          <View style={styles.formTitleContainer}>
-           <Text style={styles.title}>
-              Create Admin
-          </Text>
+                        <View style={styles.formTitleContainer}>
+                            <Text style={styles.title}>
+                                Create Admin
+                            </Text>
 
-          <Text style={styles.subtitle}>
-            Add a new GoldKing administrator
-            </Text>
-             </View>
+                            <Text style={styles.subtitle}>
+                                Add a new GoldKing administrator
+                            </Text>
+                        </View>
 
-             <TouchableOpacity
-             style={styles.exitButton}
-             onPress={handleExitCreateAdmin}
-              >
-            <Text style={styles.exitButtonText}>
-              ✕
-             </Text>
-             </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            style={styles.exitButton}
+                            onPress={handleExitCreateAdmin}
+                        >
+                            <Text style={styles.exitButtonText}>
+                                ✕
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <Text style={styles.label}>
                         Full Name
@@ -456,16 +459,16 @@ await SweetAlert.showAlert({
                         onChangeText={setFullName}
                     />
                     <Text style={styles.label}>
-                      Shop Name
+                        Shop Name
                     </Text>
 
                     <TextInput
-                    style={styles.input}
-                      placeholder="Enter shop name"
-                     placeholderTextColor="#777777"
-                     value={shopName}
-                      onChangeText={setShopName}
-                        />
+                        style={styles.input}
+                        placeholder="Enter shop name"
+                        placeholderTextColor="#777777"
+                        value={shopName}
+                        onChangeText={setShopName}
+                    />
 
                     <Text style={styles.label}>
                         Email
@@ -559,38 +562,38 @@ await SweetAlert.showAlert({
 
 const styles = StyleSheet.create({
     adminListContainer: {
-    flex: 1,
-   },
+        flex: 1,
+    },
     loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
-},
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 50,
+    },
 
-loadingText: {
-    color: '#888888',
-    fontSize: 14,
-    marginTop: 12,
-},
+    loadingText: {
+        color: '#888888',
+        fontSize: 14,
+        marginTop: 12,
+    },
 
-emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
-},
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 50,
+    },
 
-emptyTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-},
+    emptyTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '700',
+    },
 
-emptyText: {
-    color: '#777777',
-    fontSize: 13,
-    marginTop: 8,
-    textAlign: 'center',
-},
+    emptyText: {
+        color: '#777777',
+        fontSize: 13,
+        marginTop: 8,
+        textAlign: 'center',
+    },
     flex: {
         flex: 1,
     },
@@ -615,35 +618,35 @@ emptyText: {
         marginBottom: 30,
     },
     backButtonContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 21,
-    borderWidth: 0,
-    borderColor: '#D4AF37',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-},
-
-    formTitleContainer: {
-    flex: 1,
+        width: 52,
+        height: 52,
+        borderRadius: 21,
+        borderWidth: 0,
+        borderColor: '#D4AF37',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
 
-  exitButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 21,
-    borderColor: '#555555',
-    backgroundColor: '#1A1A1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-},
+    formTitleContainer: {
+        flex: 1,
+    },
+
+    exitButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 21,
+        borderColor: '#555555',
+        backgroundColor: '#1A1A1A',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
     exitButtonText: {
-    color: '#D4AF37',
-    fontSize: 20,
-    fontWeight: '700',
-        },
+        color: '#D4AF37',
+        fontSize: 20,
+        fontWeight: '700',
+    },
 
     menuButton: {
         color: '#D4AF37',
@@ -705,15 +708,15 @@ emptyText: {
     },
 
     addButton: {
-    height: 55,
-    borderRadius: 12,
-    backgroundColor: '#D4AF37',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 24,
-    marginTop: 10,
-    marginBottom: 15,
-},
+        height: 55,
+        borderRadius: 12,
+        backgroundColor: '#D4AF37',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 24,
+        marginTop: 10,
+        marginBottom: 15,
+    },
 
     addButtonText: {
         color: '#111111',
@@ -742,141 +745,147 @@ emptyText: {
         opacity: 0.6,
     },
     sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-},
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
 
-countText: {
-    color: '#777777',
-    fontSize: 13,
+    countText: {
+        color: '#777777',
+        fontSize: 13,
 
-},
+    },
 
-totalBadge: {
-    width: 35,
-    height: 35,
-    borderRadius: 23,
-    backgroundColor: '#D4AF37',
-    justifyContent: 'center',
-    alignItems: 'center',
-},
+    totalBadge: {
+        width: 35,
+        height: 35,
+        borderRadius: 23,
+        backgroundColor: '#D4AF37',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
-totalBadgeText: {
-    color: '#111111',
-    fontSize: 13,
-    fontWeight: '800',
-},
+    totalBadgeText: {
+        color: '#111111',
+        fontSize: 13,
+        fontWeight: '800',
+    },
 
-adminCard: {
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#2D2D2D',
-    borderRadius: 15,
-    padding: 10,
-    marginBottom: 10,
-},
+    adminCard: {
+        backgroundColor: '#181818',
+        borderWidth: 1,
+        borderColor: '#2D2D2D',
+        borderRadius: 15,
+        padding: 10,
+        marginBottom: 10,
+    },
 
-adminHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-},
+    adminHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
 
-avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#D4AF37',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-},
+    avatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#D4AF37',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
 
-avatarText: {
-    color: '#111111',
-    fontSize: 20,
-    fontWeight: '800',
-},
+    avatarText: {
+        color: '#111111',
+        fontSize: 20,
+        fontWeight: '800',
+    },
 
-adminInfo: {
-    flex: 1,
-},
+    adminInfo: {
+        flex: 1,
+    },
 
-adminName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-},
+    adminName: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
 
-adminEmail: {
-    color: '#777777',
-    fontSize: 11,
-    marginTop: 4,
-},
+    adminEmail: {
+        color: '#777777',
+        fontSize: 11,
+        marginTop: 4,
+    },
 
-statusBadge: {
-    backgroundColor: '#17301F',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 10,
-},
+    statusBadge: {
+        backgroundColor: '#17301F',
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 10,
+    },
 
-statusText: {
-    color: '#55C878',
-    fontSize: 10,
-    fontWeight: '700',
-},
+    statusText: {
+        color: '#55C878',
+        fontSize: 10,
+        fontWeight: '700',
+    },
 
-divider: {
-    height: 1,
-    backgroundColor: '#292929',
-    marginVertical: 14,
-},
+    divider: {
+        height: 1,
+        backgroundColor: '#292929',
+        marginVertical: 14,
+    },
 
-adminDetail: {
-    color: '#BBBBBB',
-    fontSize: 13,
-    marginBottom: 8,
-},
+    adminDetail: {
+        color: '#BBBBBB',
+        fontSize: 13,
+        marginBottom: 8,
+    },
 
-actionRow: {
-    flexDirection: 'row',
-    marginTop: 8,
-},
+    actionRow: {
+        flexDirection: 'row',
+        marginTop: 8,
+    },
 
-viewButton: {
-    flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#D4AF37',
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 5,
-},
+    viewButton: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#D4AF37',
+        borderRadius: 9,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 5,
+    },
 
-viewButtonText: {
-    color: '#D4AF37',
-    fontSize: 12,
-    fontWeight: '800',
-},
+    viewButtonText: {
+        color: '#D4AF37',
+        fontSize: 12,
+        fontWeight: '800',
+    },
 
-editButton: {
-    flex: 1,
-    height: 40,
-    backgroundColor: '#D4AF37',
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 5,
-},
+    editButton: {
+        flex: 1,
+        height: 40,
+        backgroundColor: '#D4AF37',
+        borderRadius: 9,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 5,
+    },
 
-editButtonText: {
-    color: '#111111',
-    fontSize: 12,
-    fontWeight: '800',
-},
+    editButtonText: {
+        color: '#111111',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    adminShop: {
+        color: '#D4AF37',
+        fontSize: 12,
+        marginTop: 4,
+        fontWeight: '600',
+    },
 });
 
 export default AdminManagementScreen;

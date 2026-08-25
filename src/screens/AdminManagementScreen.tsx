@@ -24,6 +24,8 @@ const AdminManagementScreen = ({ navigation }: any) => {
     const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
     const [password, setPassword] = useState('');
+    const [editMode, setEditMode] = useState(false);
+    const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(false);
     const [admins, setAdmins] = useState<any[]>([]);
@@ -35,9 +37,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select(
-                    'id, full_name, email, phone, city, address,shop_name, status, role'
-                )
+                .select('id, full_name, email, phone, city, address,shop_name, status, role')
                 .eq('role', 'admin')
                 .order('full_name', { ascending: true });
 
@@ -52,9 +52,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
             await SweetAlert.showAlert({
                 style: 'error',
                 title: 'Unable to Load Admins',
-                subTitle:
-                    error?.message ||
-                    'Could not load administrators.',
+                subTitle: error?.message || 'Could not load administrators.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -62,9 +60,6 @@ const AdminManagementScreen = ({ navigation }: any) => {
             setLoadingAdmins(false);
         }
     };
-    useEffect(() => {
-        loadAdmins();
-    }, []);
     useEffect(() => {
         loadAdmins();
     }, []);
@@ -87,8 +82,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
         const result = await SweetAlert.showAlert({
             style: 'warning',
             title: 'Discard Changes?',
-            subTitle:
-                'You have unsaved changes. Are you sure you want to discard them?',
+            subTitle: 'You have unsaved changes. Are you sure you want to discard them?',
             confirmButtonTitle: 'DISCARD',
             confirmButtonColor: '#D4AF37',
         });
@@ -105,8 +99,23 @@ const AdminManagementScreen = ({ navigation }: any) => {
             setShowForm(false);
         }
     };
-    const handleCreateAdmin = async () => {
 
+    const handleEditAdmin = (admin: any) => {
+        setEditingAdminId(admin.id);
+        setEditMode(true);
+
+        setShopName(admin.shop_name || '');
+        setFullName(admin.full_name || '');
+        setEmail(admin.email || '');
+        setPhone(admin.phone || '');
+        setCity(admin.city || '');
+        setAddress(admin.address || '');
+        setPassword('');
+
+        setShowForm(true);
+    };
+
+    const handleCreateAdmin = async () => {
         if (!shopName.trim()) {
             await SweetAlert.showAlert({
                 style: 'warning',
@@ -186,20 +195,17 @@ const AdminManagementScreen = ({ navigation }: any) => {
         setLoading(true);
 
         try {
-            const { data, error } = await supabase.functions.invoke(
-                'create-admin',
-                {
-                    body: {
-                        shopName: shopName.trim(),
-                        fullName: fullName.trim(),
-                        email: email.trim(),
-                        phone: phone.trim(),
-                        city: city.trim(),
-                        address: address.trim(),
-                        password,
-                    },
-                }
-            );
+            const { data, error } = await supabase.functions.invoke('create-admin', {
+                body: {
+                    shopName: shopName.trim(),
+                    fullName: fullName.trim(),
+                    email: email.trim(),
+                    phone: phone.trim(),
+                    city: city.trim(),
+                    address: address.trim(),
+                    password,
+                },
+            });
 
             if (error) {
                 throw new Error(error.message || 'Failed to create admin.');
@@ -230,9 +236,75 @@ const AdminManagementScreen = ({ navigation }: any) => {
             await SweetAlert.showAlert({
                 style: 'error',
                 title: 'Error',
-                subTitle:
-                    error?.message ||
-                    'Something went wrong. Please try again.',
+                subTitle: error?.message || 'Something went wrong. Please try again.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateAdmin = async () => {
+        if (!editingAdminId) {
+            return;
+        }
+
+        if (
+            !shopName.trim() ||
+            !fullName.trim() ||
+            !email.trim() ||
+            !phone.trim() ||
+            !city.trim() ||
+            !address.trim()
+        ) {
+            await SweetAlert.showAlert({
+                style: 'warning',
+                title: 'Missing Information',
+                subTitle: 'Please complete all administrator fields.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    shop_name: shopName.trim(),
+                    full_name: fullName.trim(),
+                    email: email.trim(),
+                    phone: phone.trim(),
+                    city: city.trim(),
+                    address: address.trim(),
+                })
+                .eq('id', editingAdminId);
+
+            if (error) {
+                throw error;
+            }
+
+            await SweetAlert.showAlert({
+                style: 'success',
+                title: 'Admin Updated',
+                subTitle: 'The administrator has been updated successfully.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+
+            setEditMode(false);
+            setEditingAdminId(null);
+            setShowForm(false);
+            setPassword('');
+            await loadAdmins();
+        } catch (error: any) {
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Error',
+                subTitle: error?.message || 'Something went wrong. Please try again.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -245,60 +317,42 @@ const AdminManagementScreen = ({ navigation }: any) => {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.openDrawer()}
-                    >
+                    <TouchableOpacity onPress={() => navigation.openDrawer()}>
                         <Text style={styles.menuButton}>☰</Text>
                     </TouchableOpacity>
 
                     <View>
-                        <Text style={styles.title}>
-                            Admin Management
-                        </Text>
+                        <Text style={styles.title}>Admin Management</Text>
 
-                        <Text style={styles.subtitle}>
-                            Manage GoldKing administrators
-                        </Text>
+                        <Text style={styles.subtitle}>Manage GoldKing administrators</Text>
                     </View>
                 </View>
                 <View style={styles.adminListContainer}></View>
                 <ScrollView
                     style={styles.content}
+                    contentContainerStyle={styles.adminScrollContent}
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.sectionHeader}>
                         <View>
-                            <Text style={styles.heading}>
-                                Administrators
-                            </Text>
+                            <Text style={styles.heading}>Administrators</Text>
 
-                            <Text style={styles.countText}>
-                                {admins.length} administrators
-                            </Text>
+                            <Text style={styles.countText}>{admins.length} administrators</Text>
                         </View>
 
                         <View style={styles.totalBadge}>
-                            <Text style={styles.totalBadgeText}>
-                                {admins.length}
-                            </Text>
+                            <Text style={styles.totalBadgeText}>{admins.length}</Text>
                         </View>
                     </View>
                     {loadingAdmins ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator
-                                size="large"
-                                color="#D4AF37"
-                            />
+                            <ActivityIndicator size="large" color="#D4AF37" />
 
-                            <Text style={styles.loadingText}>
-                                Loading administrators...
-                            </Text>
+                            <Text style={styles.loadingText}>Loading administrators...</Text>
                         </View>
                     ) : admins.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyTitle}>
-                                No Administrators
-                            </Text>
+                            <Text style={styles.emptyTitle}>No Administrators</Text>
 
                             <Text style={styles.emptyText}>
                                 No admin accounts have been created yet.
@@ -307,10 +361,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                     ) : (
                         <>
                             {admins.map((admin: any) => (
-                                <View
-                                    key={admin.id}
-                                    style={styles.adminCard}
-                                >
+                                <View key={admin.id} style={styles.adminCard}>
                                     <View style={styles.adminHeader}>
                                         <View style={styles.avatar}>
                                             <Text style={styles.avatarText}>
@@ -322,31 +373,24 @@ const AdminManagementScreen = ({ navigation }: any) => {
                                             <Text style={styles.adminName}>
                                                 {admin.full_name || 'Unnamed Admin'}
                                             </Text>
-                                            <Text style={styles.adminShop}>
-                                                🏪 {admin.shop_name || 'No Shop Name'}
-                                            </Text>
 
-                                            <Text style={styles.adminEmail}>
-                                                {admin.email}
-                                            </Text>
+                                            <Text style={styles.adminEmail}>{admin.email}</Text>
                                         </View>
 
                                         <View style={styles.statusBadge}>
-                                            <Text style={styles.statusText}>
-                                                ● {admin.status}
-                                            </Text>
+                                            <Text style={styles.statusText}>● {admin.status}</Text>
                                         </View>
                                     </View>
 
                                     <View style={styles.divider} />
 
-                                    <Text style={styles.adminDetail}>
-                                        📞 {admin.phone}
+                                    <Text style={styles.adminDetail}>📞 {admin.phone}</Text>
+
+                                    <Text style={styles.adminShop}>
+                                        🏪 {admin.shop_name || 'No Shop Name'}
                                     </Text>
 
-                                    <Text style={styles.adminDetail}>
-                                        📍 {admin.city}
-                                    </Text>
+                                    <Text style={styles.adminDetail}>📍 {admin.city}</Text>
 
                                     <View style={styles.actionRow}>
                                         <TouchableOpacity
@@ -355,34 +399,20 @@ const AdminManagementScreen = ({ navigation }: any) => {
                                                 SweetAlert.showAlert({
                                                     style: 'normal',
                                                     title: admin.full_name || 'Unnamed Admin',
-                                                    subTitle:
-                                                        `${admin.email}\n${admin.phone}\n${admin.city}`,
+                                                    subTitle: `${admin.email}\n${admin.phone}\n${admin.city}`,
                                                     confirmButtonTitle: 'OK',
                                                     confirmButtonColor: '#D4AF37',
                                                 })
                                             }
                                         >
-                                            <Text style={styles.viewButtonText}>
-                                                VIEW
-                                            </Text>
+                                            <Text style={styles.viewButtonText}>VIEW</Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
                                             style={styles.editButton}
-                                            onPress={() =>
-                                                SweetAlert.showAlert({
-                                                    style: 'normal',
-                                                    title: 'Edit Admin',
-                                                    subTitle:
-                                                        'Admin editing will be connected later.',
-                                                    confirmButtonTitle: 'OK',
-                                                    confirmButtonColor: '#D4AF37',
-                                                })
-                                            }
+                                            onPress={() => handleEditAdmin(admin)}
                                         >
-                                            <Text style={styles.editButtonText}>
-                                                EDIT
-                                            </Text>
+                                            <Text style={styles.editButtonText}>EDIT</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -392,11 +422,12 @@ const AdminManagementScreen = ({ navigation }: any) => {
                 </ScrollView>
                 <TouchableOpacity
                     style={styles.addButton}
-                    onPress={() => setShowForm(true)}
+                    onPress={() => {
+                        setEditMode(false);
+                        setShowForm(true);
+                    }}
                 >
-                    <Text style={styles.addButtonText}>
-                        + CREATE ADMIN
-                    </Text>
+                    <Text style={styles.addButtonText}>+ CREATE ADMIN</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -406,11 +437,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
                 style={styles.flex}
-                behavior={
-                    Platform.OS === 'ios'
-                        ? 'padding'
-                        : undefined
-                }
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView
                     contentContainerStyle={styles.formContent}
@@ -422,34 +449,27 @@ const AdminManagementScreen = ({ navigation }: any) => {
                             style={styles.backButtonContainer}
                             onPress={handleExitCreateAdmin}
                         >
-                            <Text style={styles.backButton}>
-                                ‹
-                            </Text>
+                            <Text style={styles.backButton}>‹</Text>
                         </TouchableOpacity>
 
                         <View style={styles.formTitleContainer}>
                             <Text style={styles.title}>
-                                Create Admin
+                                {editMode ? 'Edit Admin' : 'Create Admin'}
                             </Text>
 
                             <Text style={styles.subtitle}>
-                                Add a new GoldKing administrator
+                                {editMode
+                                    ? 'Update GoldKing administrator details'
+                                    : 'Add a new GoldKing administrator'}
                             </Text>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.exitButton}
-                            onPress={handleExitCreateAdmin}
-                        >
-                            <Text style={styles.exitButtonText}>
-                                ✕
-                            </Text>
+                        <TouchableOpacity style={styles.exitButton} onPress={handleExitCreateAdmin}>
+                            <Text style={styles.exitButtonText}>✕</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.label}>
-                        Full Name
-                    </Text>
+                    <Text style={styles.label}>Full Name</Text>
 
                     <TextInput
                         style={styles.input}
@@ -458,9 +478,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         value={fullName}
                         onChangeText={setFullName}
                     />
-                    <Text style={styles.label}>
-                        Shop Name
-                    </Text>
+                    <Text style={styles.label}>Shop Name</Text>
 
                     <TextInput
                         style={styles.input}
@@ -470,9 +488,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         onChangeText={setShopName}
                     />
 
-                    <Text style={styles.label}>
-                        Email
-                    </Text>
+                    <Text style={styles.label}>Email</Text>
 
                     <TextInput
                         style={styles.input}
@@ -484,9 +500,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         autoCapitalize="none"
                     />
 
-                    <Text style={styles.label}>
-                        Phone
-                    </Text>
+                    <Text style={styles.label}>Phone</Text>
 
                     <TextInput
                         style={styles.input}
@@ -497,9 +511,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         keyboardType="phone-pad"
                     />
 
-                    <Text style={styles.label}>
-                        City
-                    </Text>
+                    <Text style={styles.label}>City</Text>
 
                     <TextInput
                         style={styles.input}
@@ -509,9 +521,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         onChangeText={setCity}
                     />
 
-                    <Text style={styles.label}>
-                        Exact Address
-                    </Text>
+                    <Text style={styles.label}>Exact Address</Text>
 
                     <TextInput
                         style={styles.input}
@@ -521,36 +531,31 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         onChangeText={setAddress}
                     />
 
-                    <Text style={styles.label}>
-                        Password
-                    </Text>
+                    {!editMode && (
+                        <>
+                            <Text style={styles.label}>Password</Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter password"
-                        placeholderTextColor="#777777"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                    />
-
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter password"
+                                placeholderTextColor="#777777"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoCapitalize="none"
+                            />
+                        </>
+                    )}
                     <TouchableOpacity
-                        style={[
-                            styles.createButton,
-                            loading && styles.disabledButton,
-                        ]}
-                        onPress={handleCreateAdmin}
+                        style={[styles.createButton, loading && styles.disabledButton]}
+                        onPress={editMode ? handleUpdateAdmin : handleCreateAdmin}
                         disabled={loading}
                     >
                         {loading ? (
-                            <ActivityIndicator
-                                size="small"
-                                color="#111111"
-                            />
+                            <ActivityIndicator size="small" color="#111111" />
                         ) : (
                             <Text style={styles.createButtonText}>
-                                CREATE ADMIN
+                                {editMode ? 'SAVE CHANGES' : 'CREATE ADMIN'}
                             </Text>
                         )}
                     </TouchableOpacity>
@@ -673,7 +678,11 @@ const styles = StyleSheet.create({
     },
 
     content: {
-        padding: 24,
+        padding: 14,
+    },
+
+    adminScrollContent: {
+        paddingBottom: 140,
     },
 
     formContent: {
@@ -708,14 +717,16 @@ const styles = StyleSheet.create({
     },
 
     addButton: {
+        position: 'absolute',
+        bottom: 15,
+        left: 24,
+        right: 24,
         height: 55,
         borderRadius: 12,
         backgroundColor: '#D4AF37',
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 24,
-        marginTop: 10,
-        marginBottom: 15,
+        margin: 0,
     },
 
     addButtonText: {
@@ -754,7 +765,6 @@ const styles = StyleSheet.create({
     countText: {
         color: '#777777',
         fontSize: 13,
-
     },
 
     totalBadge: {
@@ -850,7 +860,7 @@ const styles = StyleSheet.create({
 
     viewButton: {
         flex: 1,
-        height: 40,
+        height: 30,
         borderWidth: 1,
         borderColor: '#D4AF37',
         borderRadius: 9,
@@ -867,7 +877,7 @@ const styles = StyleSheet.create({
 
     editButton: {
         flex: 1,
-        height: 40,
+        height: 30,
         backgroundColor: '#D4AF37',
         borderRadius: 9,
         justifyContent: 'center',
@@ -877,7 +887,7 @@ const styles = StyleSheet.create({
 
     editButtonText: {
         color: '#111111',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
     },
     adminShop: {

@@ -73,8 +73,7 @@ const RegistrationScreen = () => {
             return;
         }
 
-        const emailRegex =
-            /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
         if (!emailRegex.test(email.trim())) {
             await SweetAlert.showAlert({
@@ -183,8 +182,7 @@ const RegistrationScreen = () => {
             await SweetAlert.showAlert({
                 style: 'error',
                 title: 'Passwords Do Not Match',
-                subTitle:
-                    'Your password and confirm password must be exactly the same.',
+                subTitle: 'Your password and confirm password must be exactly the same.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -229,18 +227,16 @@ const RegistrationScreen = () => {
                 throw new Error('User account could not be created.');
             }
 
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .insert({
-                    id: data.user.id,
-                    full_name: fullName.trim(),
-                    email: email.trim(),
-                    phone: phone.trim(),
-                    city: city.trim(),
-                    address: address.trim(),
-                    status: 'pending',
-                    role: 'user',
-                });
+            const { error: profileError } = await supabase.from('profiles').insert({
+                id: data.user.id,
+                full_name: fullName.trim(),
+                email: email.trim(),
+                phone: phone.trim(),
+                city: city.trim(),
+                address: address.trim(),
+                status: 'pending',
+                role: 'user',
+            });
 
             if (profileError) {
                 throw profileError;
@@ -285,7 +281,6 @@ const RegistrationScreen = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.header}>
-
                     <Text style={styles.brand}>GOLD KING</Text>
 
                     <Text style={styles.tagline}>JEWELLERY & GOLD</Text>
@@ -294,15 +289,11 @@ const RegistrationScreen = () => {
 
                     <Text style={styles.heading}>Create Account</Text>
 
-                    <Text style={styles.description}>
-                        Join Gold King and create your account
-                    </Text>
+                    <Text style={styles.description}>Join Gold King and create your account</Text>
                 </View>
 
                 <View style={styles.formCard}>
-                    <Text style={styles.sectionTitle}>
-                        PERSONAL INFORMATION
-                    </Text>
+                    <Text style={styles.sectionTitle}>PERSONAL INFORMATION</Text>
 
                     <Text style={styles.label}>Full Name</Text>
 
@@ -380,9 +371,7 @@ const RegistrationScreen = () => {
                         />
                     </View>
 
-                    <Text style={[styles.sectionTitle, styles.securityTitle]}>
-                        SECURITY
-                    </Text>
+                    <Text style={[styles.sectionTitle, styles.securityTitle]}>SECURITY</Text>
 
                     <Text style={styles.label}>Password</Text>
 
@@ -402,9 +391,7 @@ const RegistrationScreen = () => {
                             onPress={() => setShowPassword(!showPassword)}
                             style={styles.eyeButton}
                         >
-                            <Text style={styles.eyeIcon}>
-                                {showPassword ? '👁' : '👁'}
-                            </Text>
+                            <Text style={styles.eyeIcon}>{showPassword ? '👁' : '👁'}</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -423,22 +410,15 @@ const RegistrationScreen = () => {
                         />
 
                         <TouchableOpacity
-                            onPress={() =>
-                                setShowConfirmPassword(!showConfirmPassword)
-                            }
+                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                             style={styles.eyeButton}
                         >
-                            <Text style={styles.eyeIcon}>
-                                {showConfirmPassword ? '👁' : '👁'}
-                            </Text>
+                            <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁' : '👁'}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
-                        style={[
-                            styles.registerButton,
-                            loading && styles.disabledButton,
-                        ]}
+                        style={[styles.registerButton, loading && styles.disabledButton]}
                         onPress={handleRegister}
                         disabled={loading}
                         activeOpacity={0.8}

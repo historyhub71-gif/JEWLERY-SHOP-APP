@@ -32,8 +32,7 @@ const LoginScreen = ({ navigation }: any) => {
             return;
         }
 
-        const emailRegex =
-            /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
         if (!emailRegex.test(email.trim())) {
             await SweetAlert.showAlert({
@@ -85,59 +84,58 @@ const LoginScreen = ({ navigation }: any) => {
             });
 
             const {
-    data: { user },
-} = await supabase.auth.getUser();
+                data: { user },
+            } = await supabase.auth.getUser();
 
-if (!user) {
-    throw new Error('Unable to get logged-in user.');
-}
+            if (!user) {
+                throw new Error('Unable to get logged-in user.');
+            }
 
-const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, status')
-    .eq('id', user.id)
-    .single();
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('role, status')
+                .eq('id', user.id)
+                .single();
 
-if (profileError || !profile) {
-    throw new Error('Your profile could not be found.');
-}
+            if (profileError || !profile) {
+                throw new Error('Your profile could not be found.');
+            }
 
-if (profile.status !== 'approved') {
-    await supabase.auth.signOut();
+            if (profile.status !== 'approved') {
+                await supabase.auth.signOut();
 
-    await SweetAlert.showAlert({
-        style: 'warning',
-        title: 'Account Not Approved',
-        subTitle: 'Your GoldKing account is not approved yet.',
-        confirmButtonTitle: 'OK',
-        confirmButtonColor: '#D4AF37',
-    });
+                await SweetAlert.showAlert({
+                    style: 'warning',
+                    title: 'Account Not Approved',
+                    subTitle: 'Your GoldKing account is not approved yet.',
+                    confirmButtonTitle: 'OK',
+                    confirmButtonColor: '#D4AF37',
+                });
 
-    return;
-}
+                return;
+            }
 
-if (profile.role === 'super_admin') {
-    navigation.replace('Home');
-    return;
-}
+            if (profile.role === 'super_admin') {
+                navigation.replace('Home');
+                return;
+            }
 
-if (profile.role === 'admin') {
-    navigation.replace('Home');
-    return;
-}
+            if (profile.role === 'admin') {
+                navigation.replace('Home');
+                return;
+            }
 
-if (profile.role === 'customer') {
-    navigation.replace('Home');
-    return;
-}
+            if (profile.role === 'customer') {
+                navigation.replace('Home');
+                return;
+            }
 
-throw new Error('Invalid account role.');
+            throw new Error('Invalid account role.');
         } catch (error: any) {
             await SweetAlert.showAlert({
                 style: 'error',
                 title: 'Login Failed',
-                subTitle:
-                    error?.message || 'Something went wrong. Please try again.',
+                subTitle: error?.message || 'Something went wrong. Please try again.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -159,17 +157,13 @@ throw new Error('Invalid account role.');
                 <View style={styles.logoSection}>
                     <Text style={styles.logo}>GOLD KING</Text>
 
-                    <Text style={styles.logoSubtitle}>
-                        Jewellery & Gold
-                    </Text>
+                    <Text style={styles.logoSubtitle}>Jewellery & Gold</Text>
                 </View>
 
                 <View style={styles.formContainer}>
                     <Text style={styles.title}>Welcome Back</Text>
 
-                    <Text style={styles.description}>
-                        Login to continue to your account
-                    </Text>
+                    <Text style={styles.description}>Login to continue to your account</Text>
 
                     <Text style={styles.label}>Email</Text>
 
@@ -202,43 +196,27 @@ throw new Error('Invalid account role.');
                             style={styles.eyeButton}
                             onPress={() => setShowPassword(!showPassword)}
                         >
-                            <Text style={styles.eyeIcon}>
-                                {showPassword ? '◉' : '◌'}
-                            </Text>
+                            <Text style={styles.eyeIcon}>{showPassword ? '◉' : '◌'}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
-                        style={[
-                            styles.loginButton,
-                            loading && styles.disabledButton,
-                        ]}
+                        style={[styles.loginButton, loading && styles.disabledButton]}
                         onPress={handleLogin}
                         disabled={loading}
                     >
                         {loading ? (
-                            <ActivityIndicator
-                                size="small"
-                                color="#111111"
-                            />
+                            <ActivityIndicator size="small" color="#111111" />
                         ) : (
-                            <Text style={styles.loginButtonText}>
-                                LOGIN
-                            </Text>
+                            <Text style={styles.loginButtonText}>LOGIN</Text>
                         )}
                     </TouchableOpacity>
 
                     <View style={styles.registerSection}>
-                        <Text style={styles.registerText}>
-                            Don't have an account?
-                        </Text>
+                        <Text style={styles.registerText}>Don't have an account?</Text>
 
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('Registration')}
-                        >
-                            <Text style={styles.registerLink}>
-                                Create Account
-                            </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Registration')}>
+                            <Text style={styles.registerLink}>Create Account</Text>
                         </TouchableOpacity>
                     </View>
                 </View>

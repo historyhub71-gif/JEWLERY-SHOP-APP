@@ -5,10 +5,7 @@ const ProfileScreen = ({ navigation }: any) => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.menuButton}
-                    onPress={() => navigation.openDrawer()}
-                >
+                <TouchableOpacity style={styles.menuButton} onPress={() => navigation.openDrawer()}>
                     <Text style={styles.menuIcon}>☰</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>PROFILE</Text>

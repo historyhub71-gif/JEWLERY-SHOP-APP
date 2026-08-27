@@ -25,18 +25,16 @@ jest.mock('react-native-reanimated', () => {
 });
 
 // Mock Worklets
-jest.mock('react-native-worklets', () => ({
-  Worklets: {
-    createContext: jest.fn(),
-    createRunInContext: jest.fn(),
-  },
-}));
+jest.mock('react-native-worklets', () =>
+  jest.requireActual('./jest-mocks/react-native-worklets'),
+);
 
 // Mock react-native-screens
 jest.mock('react-native-screens', () => {
   const React = require('react');
   const { View } = require('react-native');
   return {
+    compatibilityFlags: {},
     enableScreens: jest.fn(),
     ScreenContainer: View,
     Screen: View,
@@ -52,9 +50,22 @@ jest.mock('react-native-screens', () => {
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
   const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  const SafeAreaContext = React.createContext({
+    insets: inset,
+    frame: { x: 0, y: 0, width: 0, height: 0 },
+  });
+
   return {
-    SafeAreaProvider: ({ children }) => children,
+    SafeAreaContext,
+    SafeAreaInsetsContext: SafeAreaContext,
+    SafeAreaProvider: ({ children }) =>
+      React.createElement(
+        SafeAreaContext.Provider,
+        { value: { insets: inset, frame: { x: 0, y: 0, width: 0, height: 0 } } },
+        children,
+      ),
     SafeAreaView: ({ children }) => children,
     useSafeAreaInsets: () => inset,
     SafeAreaConsumer: ({ children }) => children(inset),

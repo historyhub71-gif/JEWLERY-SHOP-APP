@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -26,6 +27,8 @@ const AdminManagementScreen = ({ navigation }: any) => {
     const [password, setPassword] = useState('');
     const [editMode, setEditMode] = useState(false);
     const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [adminToDelete, setAdminToDelete] = useState<any>(null);
 
     const [loading, setLoading] = useState(false);
     const [admins, setAdmins] = useState<any[]>([]);
@@ -312,6 +315,63 @@ const AdminManagementScreen = ({ navigation }: any) => {
             setLoading(false);
         }
     };
+    const handleDeleteAdmin = (admin: any) => {
+        setAdminToDelete(admin);
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDeleteAdmin = async () => {
+        if (!adminToDelete?.id) {
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const { data, error } = await supabase.functions.invoke('delete-admin', {
+                body: {
+                    adminId: adminToDelete.id,
+                },
+            });
+
+            console.log('DELETE FUNCTION DATA:', data);
+            console.log('DELETE FUNCTION ERROR:', error);
+
+            if (error) {
+                console.error('DELETE FUNCTION ERROR DETAILS:', JSON.stringify(error, null, 2));
+                throw new Error(error.message || 'Failed to delete admin.');
+            }
+
+            if (!data?.success) {
+                throw new Error(data?.error || 'Failed to delete admin.');
+            }
+
+            setDeleteModalVisible(false);
+            setAdminToDelete(null);
+
+            await SweetAlert.showAlert({
+                style: 'success',
+                title: 'Admin Deleted',
+                subTitle: 'The administrator has been deleted successfully.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+
+            await loadAdmins();
+        } catch (error: any) {
+            console.error('DELETE ADMIN ERROR:', error);
+
+            await SweetAlert.showAlert({
+                style: 'error',
+                title: 'Delete Failed',
+                subTitle: error?.message || 'Could not delete administrator.',
+                confirmButtonTitle: 'OK',
+                confirmButtonColor: '#D4AF37',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (!showForm) {
         return (
@@ -327,7 +387,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                         <Text style={styles.subtitle}>Manage GoldKing administrators</Text>
                     </View>
                 </View>
-                <View style={styles.adminListContainer}></View>
+
                 <ScrollView
                     style={styles.content}
                     contentContainerStyle={styles.adminScrollContent}
@@ -344,6 +404,7 @@ const AdminManagementScreen = ({ navigation }: any) => {
                             <Text style={styles.totalBadgeText}>{admins.length}</Text>
                         </View>
                     </View>
+
                     {loadingAdmins ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="large" color="#D4AF37" />
@@ -359,67 +420,123 @@ const AdminManagementScreen = ({ navigation }: any) => {
                             </Text>
                         </View>
                     ) : (
-                        <>
-                            {admins.map((admin: any) => (
-                                <View key={admin.id} style={styles.adminCard}>
-                                    <View style={styles.adminHeader}>
-                                        <View style={styles.avatar}>
-                                            <Text style={styles.avatarText}>
-                                                {admin.full_name?.charAt(0)?.toUpperCase() || 'A'}
-                                            </Text>
-                                        </View>
-
-                                        <View style={styles.adminInfo}>
-                                            <Text style={styles.adminName}>
-                                                {admin.full_name || 'Unnamed Admin'}
-                                            </Text>
-
-                                            <Text style={styles.adminEmail}>{admin.email}</Text>
-                                        </View>
-
-                                        <View style={styles.statusBadge}>
-                                            <Text style={styles.statusText}>● {admin.status}</Text>
-                                        </View>
+                        admins.map((admin: any) => (
+                            <View key={admin.id} style={styles.adminCard}>
+                                <View style={styles.adminHeader}>
+                                    <View style={styles.avatar}>
+                                        <Text style={styles.avatarText}>
+                                            {admin.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                                        </Text>
                                     </View>
 
-                                    <View style={styles.divider} />
+                                    <View style={styles.adminInfo}>
+                                        <Text style={styles.adminName}>
+                                            {admin.full_name || 'Unnamed Admin'}
+                                        </Text>
 
-                                    <Text style={styles.adminDetail}>📞 {admin.phone}</Text>
+                                        <Text style={styles.adminEmail}>{admin.email}</Text>
+                                    </View>
 
-                                    <Text style={styles.adminShop}>
-                                        🏪 {admin.shop_name || 'No Shop Name'}
-                                    </Text>
-
-                                    <Text style={styles.adminDetail}>📍 {admin.city}</Text>
-
-                                    <View style={styles.actionRow}>
-                                        <TouchableOpacity
-                                            style={styles.viewButton}
-                                            onPress={() =>
-                                                SweetAlert.showAlert({
-                                                    style: 'normal',
-                                                    title: admin.full_name || 'Unnamed Admin',
-                                                    subTitle: `${admin.email}\n${admin.phone}\n${admin.city}`,
-                                                    confirmButtonTitle: 'OK',
-                                                    confirmButtonColor: '#D4AF37',
-                                                })
-                                            }
-                                        >
-                                            <Text style={styles.viewButtonText}>VIEW</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={styles.editButton}
-                                            onPress={() => handleEditAdmin(admin)}
-                                        >
-                                            <Text style={styles.editButtonText}>EDIT</Text>
-                                        </TouchableOpacity>
+                                    <View style={styles.statusBadge}>
+                                        <Text style={styles.statusText}>● {admin.status}</Text>
                                     </View>
                                 </View>
-                            ))}
-                        </>
+
+                                <View style={styles.divider} />
+
+                                <Text style={styles.adminDetail}>📞 {admin.phone}</Text>
+
+                                <Text style={styles.adminShop}>
+                                    🏪 {admin.shop_name || 'No Shop Name'}
+                                </Text>
+
+                                <Text style={styles.adminDetail}>📍 {admin.city}</Text>
+
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity
+                                        style={styles.viewButton}
+                                        onPress={() =>
+                                            SweetAlert.showAlert({
+                                                style: 'normal',
+                                                title: admin.full_name || 'Unnamed Admin',
+                                                subTitle: `${admin.email}\n${admin.phone}\n${admin.city}`,
+                                                confirmButtonTitle: 'OK',
+                                                confirmButtonColor: '#D4AF37',
+                                            })
+                                        }
+                                    >
+                                        <Text style={styles.viewButtonText}>VIEW</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.editButton}
+                                        onPress={() => handleEditAdmin(admin)}
+                                    >
+                                        <Text style={styles.editButtonText}>EDIT</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.deleteButton}
+                                        onPress={() => handleDeleteAdmin(admin)}
+                                    >
+                                        <Text style={styles.deleteButtonText}>DELETE</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))
                     )}
                 </ScrollView>
+
+                <Modal
+                    visible={deleteModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setDeleteModalVisible(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPress={() => setDeleteModalVisible(false)}
+                    >
+                        <TouchableOpacity
+                            style={styles.deleteModal}
+                            activeOpacity={1}
+                            onPress={e => e.stopPropagation()}
+                        >
+                            <Text style={styles.deleteModalTitle}>Delete Admin?</Text>
+
+                            <Text style={styles.deleteModalText}>
+                                Are you sure you want to delete{' '}
+                                {adminToDelete?.full_name || 'this administrator'}?
+                            </Text>
+
+                            <View style={styles.deleteModalActions}>
+                                <TouchableOpacity
+                                    style={styles.cancelDeleteButton}
+                                    onPress={() => {
+                                        setDeleteModalVisible(false);
+                                        setAdminToDelete(null);
+                                    }}
+                                >
+                                    <Text style={styles.cancelDeleteText}>CANCEL</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.confirmDeleteButton}
+                                    onPress={confirmDeleteAdmin}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={styles.confirmDeleteText}>DELETE</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </Modal>
+
                 <TouchableOpacity
                     style={styles.addButton}
                     onPress={() => {
@@ -491,15 +608,15 @@ const AdminManagementScreen = ({ navigation }: any) => {
                     <Text style={styles.label}>Email</Text>
 
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, editMode && styles.disabledInput]}
                         placeholder="Enter email"
                         placeholderTextColor="#777777"
                         value={email}
-                        onChangeText={setEmail}
+                        onChangeText={editMode ? undefined : setEmail}
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        editable={!editMode}
                     />
-
                     <Text style={styles.label}>Phone</Text>
 
                     <TextInput
@@ -762,6 +879,11 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
 
+    disabledInput: {
+        backgroundColor: '#151515',
+        color: '#666666',
+    },
+
     countText: {
         color: '#777777',
         fontSize: 13,
@@ -856,6 +978,7 @@ const styles = StyleSheet.create({
     actionRow: {
         flexDirection: 'row',
         marginTop: 8,
+        gap: 6,
     },
 
     viewButton: {
@@ -866,7 +989,6 @@ const styles = StyleSheet.create({
         borderRadius: 9,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 5,
     },
 
     viewButtonText: {
@@ -882,7 +1004,6 @@ const styles = StyleSheet.create({
         borderRadius: 9,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 5,
     },
 
     editButtonText: {
@@ -895,6 +1016,90 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4,
         fontWeight: '600',
+    },
+    deleteButton: {
+        flex: 1,
+        height: 30,
+        backgroundColor: '#8B1E1E',
+        borderRadius: 9,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    deleteButtonText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+
+    deleteModal: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#1A1A1A',
+        borderWidth: 1,
+        borderColor: '#2D2D2D',
+        borderRadius: 16,
+        padding: 20,
+    },
+
+    deleteModalTitle: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '800',
+        marginBottom: 10,
+    },
+
+    deleteModalText: {
+        color: '#BBBBBB',
+        fontSize: 14,
+        lineHeight: 20,
+    },
+
+    deleteModalActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 20,
+        gap: 10,
+    },
+
+    cancelDeleteButton: {
+        flex: 1,
+        height: 44,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#444444',
+        backgroundColor: '#121212',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    cancelDeleteText: {
+        color: '#D4AF37',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+
+    confirmDeleteButton: {
+        flex: 1,
+        height: 44,
+        borderRadius: 10,
+        backgroundColor: '#8B1E1E',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    confirmDeleteText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
     },
 });
 

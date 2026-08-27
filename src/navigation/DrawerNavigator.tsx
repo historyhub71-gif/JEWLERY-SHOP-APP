@@ -1,14 +1,27 @@
 import React from 'react';
-import {View,Text,StyleSheet,
+import {
+    View,
+    Text,
+    StyleSheet,
 } from 'react-native';
-import {createDrawerNavigator,DrawerContentScrollView,DrawerItemList,  DrawerItem,
+
+import {
+    createDrawerNavigator,
+    DrawerContentScrollView,
+    DrawerItemList,
+    DrawerItem,
 } from '@react-navigation/drawer';
-import SuperAdminScreen from '../screens/SuperAdminScreen';
-import AdminManagementScreen from '../screens/AdminManagementScreen';
+
 import SweetAlert from 'react-native-sweet-alert';
+
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
+import SuperAdminDashboardScreen from '../screens/dashboards/SuperAdminDashboardScreen';
+import AdminDashboardScreen from '../screens/dashboards/AdminDashboardScreen';
+import CustomerDashboardScreen from '../screens/dashboards/CustomerDashboardScreen';
+
+import AdminManagementScreen from '../screens/AdminManagementScreen';
 import HomeScreen from '../screens/homescreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -25,15 +38,17 @@ const CustomDrawerContent = (props: any) => {
             confirmButtonColor: '#D4AF37',
             style: 'warning',
         });
-        
+
         if (!result) {
             return;
         }
-        
+
         try {
             const { error } = await supabase.auth.signOut();
 
-            if (error) throw error;
+            if (error) {
+                throw error;
+            }
 
             props.navigation.replace('Login');
         } catch (error: any) {
@@ -47,13 +62,18 @@ const CustomDrawerContent = (props: any) => {
     };
 
     return (
-        <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
+        <DrawerContentScrollView
+            {...props}
+            contentContainerStyle={{ flex: 1 }}
+        >
             <View style={styles.drawerHeader}>
                 <Text style={styles.drawerTitle}>GOLD KING</Text>
             </View>
+
             <View style={{ flex: 1 }}>
                 <DrawerItemList {...props} />
             </View>
+
             <View style={styles.logoutContainer}>
                 <DrawerItem
                     label="Logout"
@@ -69,10 +89,16 @@ const CustomDrawerContent = (props: any) => {
 
 const DrawerNavigator = () => {
     const { profile } = useAuth();
-const isSuperAdmin = profile?.role === 'super_admin';
+
+    const isSuperAdmin = profile?.role === 'super_admin';
+    const isAdmin = profile?.role === 'admin';
+    const isCustomer = profile?.role === 'customer';
+
     return (
         <Drawer.Navigator
-            drawerContent={(props) => <CustomDrawerContent {...props} />}
+            drawerContent={(props) => (
+                <CustomDrawerContent {...props} />
+            )}
             screenOptions={{
                 headerShown: false,
                 drawerStyle: {
@@ -87,13 +113,55 @@ const isSuperAdmin = profile?.role === 'super_admin';
                 },
             }}
         >
+
             {isSuperAdmin && (
-            <Drawer.Screen name="Super Admin" component={SuperAdminScreen}/>)}
-            <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
-            <Drawer.Screen name="Home" component={HomeScreen} />
-            <Drawer.Screen name="Profile" component={ProfileScreen} />
-            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
-            <Drawer.Screen name="Settings" component={SettingsScreen} />
+                <Drawer.Screen
+                    name="Super Admin"
+                    component={SuperAdminDashboardScreen}
+                />
+            )}
+
+            {isAdmin && (
+                <Drawer.Screen
+                    name="Admin"
+                    component={AdminDashboardScreen}
+                />
+            )}
+
+            {isCustomer && (
+                <Drawer.Screen
+                    name="Customer"
+                    component={CustomerDashboardScreen}
+                />
+            )}
+
+            {isSuperAdmin && (
+                <Drawer.Screen
+                    name="Admin Management"
+                    component={AdminManagementScreen}
+                />
+            )}
+
+            <Drawer.Screen
+                name="Home"
+                component={HomeScreen}
+            />
+
+            <Drawer.Screen
+                name="Profile"
+                component={ProfileScreen}
+            />
+
+            <Drawer.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+            />
+
+            <Drawer.Screen
+                name="Settings"
+                component={SettingsScreen}
+            />
+
         </Drawer.Navigator>
     );
 };
@@ -107,17 +175,20 @@ const styles = StyleSheet.create({
         borderBottomColor: '#292929',
         marginBottom: 10,
     },
+
     drawerTitle: {
         color: '#D4AF37',
         fontSize: 24,
         fontWeight: 'bold',
         letterSpacing: 2,
     },
+
     logoutContainer: {
         borderTopWidth: 1,
         borderTopColor: '#292929',
         paddingVertical: 10,
     },
+
     logoutLabel: {
         fontSize: 15,
         fontWeight: '600',

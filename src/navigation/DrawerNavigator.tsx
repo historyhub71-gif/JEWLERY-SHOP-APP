@@ -26,6 +26,7 @@ import HomeScreen from '../screens/homescreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import CustomerManagementScreen from '../screens/CustomerManagementScreen';
 
 const Drawer = createDrawerNavigator();
 
@@ -118,6 +119,13 @@ const DrawerNavigator = () => {
                 <Drawer.Screen
                     name="Super Admin"
                     component={SuperAdminDashboardScreen}
+                />
+            )}
+
+            {isSuperAdmin && (
+                <Drawer.Screen
+                    name="Customer Management"
+                    component={CustomerManagementScreen}
                 />
             )}
 

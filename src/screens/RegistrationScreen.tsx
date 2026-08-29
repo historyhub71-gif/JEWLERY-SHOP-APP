@@ -235,7 +235,7 @@ const RegistrationScreen = () => {
                 city: city.trim(),
                 address: address.trim(),
                 status: 'pending',
-                role: 'user',
+                role: 'customer',
             });
 
             if (profileError) {

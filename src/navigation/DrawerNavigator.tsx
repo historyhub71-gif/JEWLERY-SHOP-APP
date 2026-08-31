@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 import {
     createDrawerNavigator,
@@ -63,10 +59,7 @@ const CustomDrawerContent = (props: any) => {
     };
 
     return (
-        <DrawerContentScrollView
-            {...props}
-            contentContainerStyle={{ flex: 1 }}
-        >
+        <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
             <View style={styles.drawerHeader}>
                 <Text style={styles.drawerTitle}>GOLD KING</Text>
             </View>
@@ -97,9 +90,7 @@ const DrawerNavigator = () => {
 
     return (
         <Drawer.Navigator
-            drawerContent={(props) => (
-                <CustomDrawerContent {...props} />
-            )}
+            drawerContent={props => <CustomDrawerContent {...props} />}
             screenOptions={{
                 headerShown: false,
                 drawerStyle: {
@@ -114,62 +105,29 @@ const DrawerNavigator = () => {
                 },
             }}
         >
+            {isSuperAdmin && (
+                <Drawer.Screen name="Super Admin" component={SuperAdminDashboardScreen} />
+            )}
+
+            {isAdmin && <Drawer.Screen name="Admin" component={AdminDashboardScreen} />}
+
+            {isCustomer && <Drawer.Screen name="Customer" component={CustomerDashboardScreen} />}
 
             {isSuperAdmin && (
-                <Drawer.Screen
-                    name="Super Admin"
-                    component={SuperAdminDashboardScreen}
-                />
-            )}
-
-            {isSuperAdmin && (
-                <Drawer.Screen
-                    name="Customer Management"
-                    component={CustomerManagementScreen}
-                />
-            )}
-
-            {isAdmin && (
-                <Drawer.Screen
-                    name="Admin"
-                    component={AdminDashboardScreen}
-                />
-            )}
-
-            {isCustomer && (
-                <Drawer.Screen
-                    name="Customer"
-                    component={CustomerDashboardScreen}
-                />
+                <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
             )}
 
             {isSuperAdmin && (
-                <Drawer.Screen
-                    name="Admin Management"
-                    component={AdminManagementScreen}
-                />
+                <Drawer.Screen name="Customer Management" component={CustomerManagementScreen} />
             )}
 
-            <Drawer.Screen
-                name="Home"
-                component={HomeScreen}
-            />
+            <Drawer.Screen name="Home" component={HomeScreen} />
 
-            <Drawer.Screen
-                name="Profile"
-                component={ProfileScreen}
-            />
+            <Drawer.Screen name="Profile" component={ProfileScreen} />
 
-            <Drawer.Screen
-                name="Notifications"
-                component={NotificationsScreen}
-            />
+            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
 
-            <Drawer.Screen
-                name="Settings"
-                component={SettingsScreen}
-            />
-
+            <Drawer.Screen name="Settings" component={SettingsScreen} />
         </Drawer.Navigator>
     );
 };

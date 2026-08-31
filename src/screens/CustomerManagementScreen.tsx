@@ -20,6 +20,10 @@ const CustomerManagementScreen = ({ navigation }: any) => {
 
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [customerToDelete, setCustomerToDelete] = useState<any>(null);
+    const [approveModalVisible, setApproveModalVisible] = useState(false);
+    const [customerToApprove, setCustomerToApprove] = useState<any>(null);
+    const [rejectModalVisible, setRejectModalVisible] = useState(false);
+    const [customerToReject, setCustomerToReject] = useState<any>(null);
 
     const loadCustomers = async () => {
         setLoadingCustomers(true);
@@ -86,19 +90,25 @@ const CustomerManagementScreen = ({ navigation }: any) => {
 
             return;
         }
+        setCustomerToApprove(customer);
+        setApproveModalVisible(true);
+        return;
+    };
 
-        const result = await SweetAlert.showAlert({
-            style: 'warning',
-            title: 'Approve Customer?',
-            subTitle: `Are you sure you want to approve ${customer.full_name || 'this customer'}?`,
-            confirmButtonTitle: 'APPROVE',
-            confirmButtonColor: '#D4AF37',
-        });
+    const handleRejectCustomer = (customer: any) => {
+        if (!customer?.id) {
+            return;
+        }
+        setCustomerToReject(customer);
+        setRejectModalVisible(true);
+    };
 
-        if (!result) {
+    const confirmApproveCustomer = async () => {
+        if (!customerToApprove?.id) {
             return;
         }
 
+        setApproveModalVisible(false);
         setLoading(true);
 
         try {
@@ -118,7 +128,7 @@ const CustomerManagementScreen = ({ navigation }: any) => {
                     approved_by: user.id,
                     rejection_reason: null,
                 })
-                .eq('id', customer.id)
+                .eq('id', customerToApprove.id)
                 .eq('role', 'customer');
 
             if (error) {
@@ -128,11 +138,14 @@ const CustomerManagementScreen = ({ navigation }: any) => {
             await SweetAlert.showAlert({
                 style: 'success',
                 title: 'Customer Approved',
-                subTitle: `${customer.full_name || 'Customer'} has been approved successfully.`,
+                subTitle: `${
+                    customerToApprove.full_name || 'Customer'
+                } has been approved successfully.`,
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
 
+            setCustomerToApprove(null);
             await loadCustomers();
         } catch (error: any) {
             console.error('APPROVE CUSTOMER ERROR:', error);
@@ -149,23 +162,11 @@ const CustomerManagementScreen = ({ navigation }: any) => {
         }
     };
 
-    const handleRejectCustomer = async (customer: any) => {
-        if (!customer?.id) {
+    const confirmRejectCustomer = async () => {
+        if (!customerToReject?.id) {
             return;
         }
-
-        const result = await SweetAlert.showAlert({
-            style: 'warning',
-            title: 'Reject Customer?',
-            subTitle: `Are you sure you want to reject ${customer.full_name || 'this customer'}?`,
-            confirmButtonTitle: 'REJECT',
-            confirmButtonColor: '#8B1E1E',
-        });
-
-        if (!result) {
-            return;
-        }
-
+        setRejectModalVisible(false);
         setLoading(true);
 
         try {
@@ -174,17 +175,19 @@ const CustomerManagementScreen = ({ navigation }: any) => {
                 .update({
                     status: 'rejected',
                 })
-                .eq('id', customer.id)
+                .eq('id', customerToReject.id)
                 .eq('role', 'customer');
 
             if (error) {
                 throw error;
             }
 
+            setCustomerToReject(null);
+
             await SweetAlert.showAlert({
                 style: 'success',
                 title: 'Customer Rejected',
-                subTitle: `${customer.full_name || 'Customer'} has been rejected.`,
+                subTitle: `${customerToReject.full_name || 'Customer'} has been rejected.`,
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -203,8 +206,8 @@ const CustomerManagementScreen = ({ navigation }: any) => {
         } finally {
             setLoading(false);
         }
-    };
 
+    };
     const handleDeleteCustomer = (customer: any) => {
         setCustomerToDelete(customer);
         setDeleteModalVisible(true);
@@ -406,6 +409,118 @@ const CustomerManagementScreen = ({ navigation }: any) => {
                     ))
                 )}
             </ScrollView>
+
+            <Modal
+                visible={approveModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    setApproveModalVisible(false);
+                    setCustomerToApprove(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        setApproveModalVisible(false);
+                        setCustomerToApprove(null);
+                    }}
+                >
+                    <TouchableOpacity
+                        style={styles.deleteModal}
+                        activeOpacity={1}
+                        onPress={e => e.stopPropagation()}
+                    >
+                        <Text style={styles.deleteModalTitle}>Approve Customer?</Text>
+
+                        <Text style={styles.deleteModalText}>
+                            Are you sure you want to approve{' '}
+                            {customerToApprove?.full_name || 'this customer'}?
+                        </Text>
+
+                        <View style={styles.deleteModalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelDeleteButton}
+                                onPress={() => {
+                                    setApproveModalVisible(false);
+                                    setCustomerToApprove(null);
+                                }}
+                            >
+                                <Text style={styles.cancelDeleteText}>CANCEL</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.approveButton}
+                                onPress={confirmApproveCustomer}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator size="small" color="#111111" />
+                                ) : (
+                                    <Text style={styles.approveButtonText}>APPROVE</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            <Modal
+                visible={rejectModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    setRejectModalVisible(false);
+                    setCustomerToReject(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        setRejectModalVisible(false);
+                        setCustomerToReject(null);
+                    }}
+                >
+                    <TouchableOpacity
+                        style={styles.deleteModal}
+                        activeOpacity={1}
+                        onPress={e => e.stopPropagation()}
+                    >
+                        <Text style={styles.deleteModalTitle}>Reject Customer?</Text>
+
+                        <Text style={styles.deleteModalText}>
+                            Are you sure you want to reject{' '}
+                            {customerToReject?.full_name || 'this customer'}?
+                        </Text>
+
+                        <View style={styles.deleteModalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelDeleteButton}
+                                onPress={() => {
+                                    setRejectModalVisible(false);
+                                    setCustomerToReject(null);
+                                }}
+                            >
+                                <Text style={styles.cancelDeleteText}>CANCEL</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.confirmDeleteButton}
+                                onPress={confirmRejectCustomer}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.confirmDeleteText}>REJECT</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
 
             <Modal
                 visible={deleteModalVisible}
@@ -796,6 +911,20 @@ const styles = StyleSheet.create({
     rejectButtonText: {
         color: '#FFFFFF',
         fontSize: 10,
+        fontWeight: '800',
+    },
+    confirmApproveButton: {
+        flex: 1,
+        height: 44,
+        borderRadius: 10,
+        backgroundColor: '#D4AF37',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    confirmApproveText: {
+        color: '#111111',
+        fontSize: 12,
         fontWeight: '800',
     },
 });

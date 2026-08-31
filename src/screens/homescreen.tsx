@@ -88,9 +88,7 @@ const HomeScreen = ({ navigation }: any) => {
                             </Text>
                         </View>
 
-                        <View style={styles.goldIcon}>
-                            <Text style={styles.goldIconText}>Au</Text>
-                        </View>
+                        
                     </View>
 
                     <ScrollView
@@ -186,9 +184,7 @@ const HomeScreen = ({ navigation }: any) => {
                             </Text>
                         </View>
 
-                        <View style={styles.silverIcon}>
-                            <Text style={styles.silverIconText}>Ag</Text>
-                        </View>
+
                     </View>
 
                     <View style={styles.selectedInfo}>
@@ -388,21 +384,8 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    goldIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#D4AF37',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
 
-    goldIconText: {
-        color: '#111111',
-        fontSize: 16,
-        fontWeight: '900',
-    },
-
+    
     silverIcon: {
         width: 44,
         height: 44,
@@ -412,11 +395,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 
-    silverIconText: {
-        color: '#111111',
-        fontSize: 16,
-        fontWeight: '900',
-    },
+
 
     karatContainer: {
         gap: 8,

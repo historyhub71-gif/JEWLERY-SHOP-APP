@@ -27,7 +27,14 @@ const AppNavigator = () => {
             onStateChange={handleNavigationStateChange}
             onReady={handleNavigationReady}
             fallback={
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: '#000',
+                    }}
+                >
                     <Text style={{ color: '#fff' }}>Loading...</Text>
                 </View>
             }
@@ -57,9 +64,10 @@ const AppNavigator = () => {
                 />
 
                 <Stack.Screen
-                    name="Home"
+                    name="Main"
                     component={DrawerNavigator}
                 />
+
             </Stack.Navigator>
         </NavigationContainer>
     );

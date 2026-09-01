@@ -124,7 +124,7 @@ const SplashScreen = ({ navigation }: Props) => {
             profile.status === 'approved'
         ) {
             console.log('Super Admin → Home');
-            navigation.replace('Home');
+            navigation.replace('Main');
             return;
         }
 
@@ -133,7 +133,7 @@ const SplashScreen = ({ navigation }: Props) => {
             profile.status === 'approved'
         ) {
             console.log('Admin → Home');
-            navigation.replace('Home');
+            navigation.replace('Main');
             return;
         }
 
@@ -142,7 +142,7 @@ const SplashScreen = ({ navigation }: Props) => {
             profile.status === 'approved'
         ) {
             console.log('Customer → Home');
-            navigation.replace('Home');
+            navigation.replace('Main');
             return;
         }
 

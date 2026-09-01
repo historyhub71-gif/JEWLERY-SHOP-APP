@@ -8,6 +8,8 @@ import {
     DrawerItem,
 } from '@react-navigation/drawer';
 
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
 import SweetAlert from 'react-native-sweet-alert';
 
 import { useAuth } from '../context/AuthContext';
@@ -16,15 +18,17 @@ import { supabase } from '../lib/supabase';
 import SuperAdminDashboardScreen from '../screens/dashboards/SuperAdminDashboardScreen';
 import AdminDashboardScreen from '../screens/dashboards/AdminDashboardScreen';
 import CustomerDashboardScreen from '../screens/dashboards/CustomerDashboardScreen';
+import HomeScreen from '../screens/homescreen';
 
 import AdminManagementScreen from '../screens/AdminManagementScreen';
-import HomeScreen from '../screens/homescreen';
+import CustomerManagementScreen from '../screens/CustomerManagementScreen';
+
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import CustomerManagementScreen from '../screens/CustomerManagementScreen';
 
 const Drawer = createDrawerNavigator();
+const DashboardStack = createNativeStackNavigator();
 
 const CustomDrawerContent = (props: any) => {
     const handleLogout = async () => {
@@ -47,11 +51,11 @@ const CustomDrawerContent = (props: any) => {
                 throw error;
             }
 
-            props.navigation.replace('Login');
+            props.navigation.getParent()?.replace('Login');
         } catch (error: any) {
             await SweetAlert.showAlert({
                 title: 'Error',
-                subTitle: error.message,
+                subTitle: error?.message || 'Logout failed.',
                 confirmButtonTitle: 'OK',
                 style: 'error',
             });
@@ -59,7 +63,10 @@ const CustomDrawerContent = (props: any) => {
     };
 
     return (
-        <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
+        <DrawerContentScrollView
+            {...props}
+            contentContainerStyle={{ flex: 1 }}
+        >
             <View style={styles.drawerHeader}>
                 <Text style={styles.drawerTitle}>GOLD KING</Text>
             </View>
@@ -81,16 +88,74 @@ const CustomDrawerContent = (props: any) => {
     );
 };
 
+const DashboardStackNavigator = () => {
+    const { profile } = useAuth();
+
+    const role = profile?.role;
+
+    if (!role) {
+        return (
+            <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>
+                    Loading user profile...
+                </Text>
+            </View>
+        );
+    }
+
+    return (
+        <DashboardStack.Navigator
+            screenOptions={{
+                headerShown: false,
+            }}
+        >
+            {role === 'super_admin' && (
+                <DashboardStack.Screen
+                    name="SuperAdminDashboard"
+                    component={SuperAdminDashboardScreen}
+                />
+            )}
+
+            {role === 'admin' && (
+                <DashboardStack.Screen
+                    name="AdminDashboard"
+                    component={AdminDashboardScreen}
+                />
+            )}
+
+            {role === 'customer' && (
+                <DashboardStack.Screen
+                    name="CustomerDashboard"
+                    component={CustomerDashboardScreen}
+                />
+            )}
+
+            <DashboardStack.Screen
+                name="Home"
+                component={HomeScreen}
+            />
+        </DashboardStack.Navigator>
+    );
+};
+
 const DrawerNavigator = () => {
     const { profile } = useAuth();
 
-    const isSuperAdmin = profile?.role === 'super_admin';
-    const isAdmin = profile?.role === 'admin';
-    const isCustomer = profile?.role === 'customer';
+    const role = profile?.role;
+
+    const drawerTitle =
+        role === 'super_admin'
+            ? 'Super Admin'
+            : role === 'admin'
+            ? 'Admin'
+            : 'Customer';
 
     return (
         <Drawer.Navigator
-            drawerContent={props => <CustomDrawerContent {...props} />}
+            initialRouteName="Dashboard"
+            drawerContent={props => (
+                <CustomDrawerContent {...props} />
+            )}
             screenOptions={{
                 headerShown: false,
                 drawerStyle: {
@@ -105,29 +170,42 @@ const DrawerNavigator = () => {
                 },
             }}
         >
-            {isSuperAdmin && (
-                <Drawer.Screen name="Super Admin" component={SuperAdminDashboardScreen} />
+            <Drawer.Screen
+                name="Dashboard"
+                component={DashboardStackNavigator}
+                options={{
+                    title: drawerTitle,
+                }}
+            />
+
+            {role === 'super_admin' && (
+                <Drawer.Screen
+                    name="Admin Management"
+                    component={AdminManagementScreen}
+                />
             )}
 
-            {isAdmin && <Drawer.Screen name="Admin" component={AdminDashboardScreen} />}
-
-            {isCustomer && <Drawer.Screen name="Customer" component={CustomerDashboardScreen} />}
-
-            {isSuperAdmin && (
-                <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
+            {role === 'super_admin' && (
+                <Drawer.Screen
+                    name="Customer Management"
+                    component={CustomerManagementScreen}
+                />
             )}
 
-            {isSuperAdmin && (
-                <Drawer.Screen name="Customer Management" component={CustomerManagementScreen} />
-            )}
+            <Drawer.Screen
+                name="Profile"
+                component={ProfileScreen}
+            />
 
-            <Drawer.Screen name="Home" component={HomeScreen} />
+            <Drawer.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+            />
 
-            <Drawer.Screen name="Profile" component={ProfileScreen} />
-
-            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
-
-            <Drawer.Screen name="Settings" component={SettingsScreen} />
+            <Drawer.Screen
+                name="Settings"
+                component={SettingsScreen}
+            />
         </Drawer.Navigator>
     );
 };
@@ -158,6 +236,18 @@ const styles = StyleSheet.create({
     logoutLabel: {
         fontSize: 15,
         fontWeight: '600',
+    },
+
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: '#111111',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    loadingText: {
+        color: '#D4AF37',
+        fontSize: 15,
     },
 });
 

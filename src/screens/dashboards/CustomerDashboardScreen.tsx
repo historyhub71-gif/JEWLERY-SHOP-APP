@@ -19,7 +19,12 @@ const CustomerDashboardScreen = ({ navigation }: any) => {
 
                 <Text style={styles.headerTitle}>CUSTOMER</Text>
 
-                <View style={styles.headerRight} />
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    onPress={() => navigation.navigate('Home')}
+                >
+                    <Text style={styles.homeIcon}>⌂</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.content}>
@@ -70,8 +75,16 @@ const styles = StyleSheet.create({
         color: '#D4AF37',
     },
 
-    headerRight: {
+    homeButton: {
         width: 45,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    homeIcon: {
+        fontSize: 28,
+        color: '#D4AF37',
     },
 
     content: {

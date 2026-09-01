@@ -60,7 +60,12 @@ const HomeScreen = ({ navigation }: any) => {
 
                 <Text style={styles.headerTitle}>GOLD KING</Text>
 
-                <View style={styles.headerRight} />
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Text style={styles.backIcon}>✕</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -316,8 +321,16 @@ const styles = StyleSheet.create({
         color: '#D4AF37',
     },
 
-    headerRight: {
+    backButton: {
         width: 45,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    backIcon: {
+        fontSize: 28,
+        color: '#D4AF37',
     },
 
     scrollView: {

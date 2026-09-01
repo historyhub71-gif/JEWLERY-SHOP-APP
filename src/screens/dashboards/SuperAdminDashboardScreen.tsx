@@ -1,14 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import {ActivityIndicator, RefreshControl,SafeAreaView, ScrollView,StyleSheet,  Text,TouchableOpacity,View,} from 'react-native';
 
 import SweetAlert from 'react-native-sweet-alert';
 import { supabase } from '../../lib/supabase';
@@ -81,10 +72,7 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.menuButton}
-                    onPress={() => navigation.openDrawer()}
-                >
+                <TouchableOpacity style={styles.menuButton} onPress={() => navigation.openDrawer()}>
                     <Text style={styles.menuIcon}>☰</Text>
                 </TouchableOpacity>
 
@@ -94,7 +82,12 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                     <Text style={styles.headerSubtitle}>GoldKing Control Center</Text>
                 </View>
 
-                <View style={styles.headerRight} />
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    onPress={() => navigation.navigate('Home')}
+                >
+                    <Text style={styles.homeIcon}>⌂</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -112,9 +105,7 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                 <View style={styles.welcomeSection}>
                     <Text style={styles.welcomeText}>Welcome back</Text>
 
-                    <Text style={styles.dashboardTitle}>
-                        Super Admin Dashboard
-                    </Text>
+                    <Text style={styles.dashboardTitle}>Super Admin Dashboard</Text>
 
                     <Text style={styles.dashboardSubtitle}>
                         Manage your GoldKing platform from one place.
@@ -125,9 +116,7 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#D4AF37" />
 
-                        <Text style={styles.loadingText}>
-                            Loading dashboard...
-                        </Text>
+                        <Text style={styles.loadingText}>Loading dashboard...</Text>
                     </View>
                 ) : (
                     <>
@@ -137,13 +126,9 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                                     <Text style={styles.statIconText}>A</Text>
                                 </View>
 
-                                <Text style={styles.statNumber}>
-                                    {adminCount}
-                                </Text>
+                                <Text style={styles.statNumber}>{adminCount}</Text>
 
-                                <Text style={styles.statLabel}>
-                                    Administrators
-                                </Text>
+                                <Text style={styles.statLabel}>Administrators</Text>
                             </View>
 
                             <View style={styles.statCard}>
@@ -151,13 +136,9 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                                     <Text style={styles.statIconText}>C</Text>
                                 </View>
 
-                                <Text style={styles.statNumber}>
-                                    {customerCount}
-                                </Text>
+                                <Text style={styles.statNumber}>{customerCount}</Text>
 
-                                <Text style={styles.statLabel}>
-                                    Customers
-                                </Text>
+                                <Text style={styles.statLabel}>Customers</Text>
                             </View>
 
                             <View style={styles.statCard}>
@@ -165,13 +146,9 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                                     <Text style={styles.statIconText}>!</Text>
                                 </View>
 
-                                <Text style={styles.statNumber}>
-                                    {pendingCustomers}
-                                </Text>
+                                <Text style={styles.statNumber}>{pendingCustomers}</Text>
 
-                                <Text style={styles.statLabel}>
-                                    Pending Approval
-                                </Text>
+                                <Text style={styles.statLabel}>Pending Approval</Text>
                             </View>
 
                             <View style={styles.statCard}>
@@ -181,16 +158,12 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
 
                                 <Text style={styles.statNumber}>3</Text>
 
-                                <Text style={styles.statLabel}>
-                                    User Roles
-                                </Text>
+                                <Text style={styles.statLabel}>User Roles</Text>
                             </View>
                         </View>
 
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>
-                                Quick Management
-                            </Text>
+                            <Text style={styles.sectionTitle}>Quick Management</Text>
 
                             <Text style={styles.sectionSubtitle}>
                                 Access important management areas quickly.
@@ -198,20 +171,14 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
 
                             <TouchableOpacity
                                 style={styles.managementCard}
-                                onPress={() =>
-                                    navigation.navigate('Admin Management')
-                                }
+                                onPress={() => navigation.navigate('Admin Management')}
                             >
                                 <View style={styles.managementIcon}>
-                                    <Text style={styles.managementIconText}>
-                                        A
-                                    </Text>
+                                    <Text style={styles.managementIconText}>A</Text>
                                 </View>
 
                                 <View style={styles.managementInfo}>
-                                    <Text style={styles.managementTitle}>
-                                        Admin Management
-                                    </Text>
+                                    <Text style={styles.managementTitle}>Admin Management</Text>
 
                                     <Text style={styles.managementDescription}>
                                         Create, edit and manage administrators.
@@ -223,20 +190,14 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
 
                             <TouchableOpacity
                                 style={styles.managementCard}
-                                onPress={() =>
-                                    navigation.navigate('Customer Management')
-                                }
+                                onPress={() => navigation.navigate('Customer Management')}
                             >
                                 <View style={styles.managementIcon}>
-                                    <Text style={styles.managementIconText}>
-                                        C
-                                    </Text>
+                                    <Text style={styles.managementIconText}>C</Text>
                                 </View>
 
                                 <View style={styles.managementInfo}>
-                                    <Text style={styles.managementTitle}>
-                                        Customer Management
-                                    </Text>
+                                    <Text style={styles.managementTitle}>Customer Management</Text>
 
                                     <Text style={styles.managementDescription}>
                                         View and approve GoldKing customers.
@@ -261,13 +222,10 @@ const SuperAdminDashboardScreen = ({ navigation }: any) => {
                             </View>
 
                             <View style={styles.infoContent}>
-                                <Text style={styles.infoTitle}>
-                                    System Status
-                                </Text>
+                                <Text style={styles.infoTitle}>System Status</Text>
 
                                 <Text style={styles.infoText}>
-                                    GoldKing management system is active and
-                                    ready.
+                                    GoldKing management system is active and ready.
                                 </Text>
                             </View>
                         </View>
@@ -550,6 +508,19 @@ const styles = StyleSheet.create({
         color: '#777777',
         fontSize: 11,
         marginTop: 3,
+    },
+    //home icon styles
+    homeButton: {
+        width: 45,
+        height: 45,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    homeIcon: {
+        color: '#D4AF37',
+        fontSize: 30,
+        fontWeight: '700',
     },
 });
 

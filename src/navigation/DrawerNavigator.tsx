@@ -26,6 +26,7 @@ import CustomerManagementScreen from '../screens/CustomerManagementScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import CalculatorScreen from '../screens/CalculatorScreen';
 
 const Drawer = createDrawerNavigator();
 const DashboardStack = createNativeStackNavigator();
@@ -63,10 +64,7 @@ const CustomDrawerContent = (props: any) => {
     };
 
     return (
-        <DrawerContentScrollView
-            {...props}
-            contentContainerStyle={{ flex: 1 }}
-        >
+        <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
             <View style={styles.drawerHeader}>
                 <Text style={styles.drawerTitle}>GOLD KING</Text>
             </View>
@@ -96,9 +94,7 @@ const DashboardStackNavigator = () => {
     if (!role) {
         return (
             <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>
-                    Loading user profile...
-                </Text>
+                <Text style={styles.loadingText}>Loading user profile...</Text>
             </View>
         );
     }
@@ -117,10 +113,7 @@ const DashboardStackNavigator = () => {
             )}
 
             {role === 'admin' && (
-                <DashboardStack.Screen
-                    name="AdminDashboard"
-                    component={AdminDashboardScreen}
-                />
+                <DashboardStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
             )}
 
             {role === 'customer' && (
@@ -130,10 +123,7 @@ const DashboardStackNavigator = () => {
                 />
             )}
 
-            <DashboardStack.Screen
-                name="Home"
-                component={HomeScreen}
-            />
+            <DashboardStack.Screen name="Home" component={HomeScreen} />
         </DashboardStack.Navigator>
     );
 };
@@ -144,18 +134,12 @@ const DrawerNavigator = () => {
     const role = profile?.role;
 
     const drawerTitle =
-        role === 'super_admin'
-            ? 'Super Admin'
-            : role === 'admin'
-            ? 'Admin'
-            : 'Customer';
+        role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'Customer';
 
     return (
         <Drawer.Navigator
             initialRouteName="Dashboard"
-            drawerContent={props => (
-                <CustomDrawerContent {...props} />
-            )}
+            drawerContent={props => <CustomDrawerContent {...props} />}
             screenOptions={{
                 headerShown: false,
                 drawerStyle: {
@@ -179,33 +163,20 @@ const DrawerNavigator = () => {
             />
 
             {role === 'super_admin' && (
-                <Drawer.Screen
-                    name="Admin Management"
-                    component={AdminManagementScreen}
-                />
+                <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
             )}
 
             {role === 'super_admin' && (
-                <Drawer.Screen
-                    name="Customer Management"
-                    component={CustomerManagementScreen}
-                />
+                <Drawer.Screen name="Customer Management" component={CustomerManagementScreen} />
             )}
 
-            <Drawer.Screen
-                name="Profile"
-                component={ProfileScreen}
-            />
+            <Drawer.Screen name="Profile" component={ProfileScreen} />
 
-            <Drawer.Screen
-                name="Notifications"
-                component={NotificationsScreen}
-            />
+            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
 
-            <Drawer.Screen
-                name="Settings"
-                component={SettingsScreen}
-            />
+            <Drawer.Screen name="Settings" component={SettingsScreen} />
+
+            <Drawer.Screen name="Calculator" component={CalculatorScreen} />
         </Drawer.Navigator>
     );
 };

@@ -1,19 +1,15 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Bell, CheckCircle2 } from 'lucide-react-native';
+import ScreenHeader from './components/ScreenHeader';
+import StateView from './components/StateView';
+import { colors, commonStyles, spacing } from '../theme';
 
 const NotificationsScreen = ({ navigation }: any) => {
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.menuButton} onPress={() => navigation.openDrawer()}>
-                    <Text style={styles.menuIcon}>☰</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>NOTIFICATIONS</Text>
-                <View style={styles.headerRight} />
-            </View>
-            <View style={styles.content}>
-                <Text style={styles.text}>Notifications Screen</Text>
-            </View>
+            <ScreenHeader title="NOTIFICATIONS" subtitle="Stay close to what matters" navigation={navigation} />
+            <View style={styles.content}><View style={styles.banner}><Bell color={colors.gold} size={23} /><View style={styles.bannerCopy}><Text style={styles.bannerTitle}>All caught up</Text><Text style={styles.bannerText}>Important account updates will appear here.</Text></View><CheckCircle2 color={colors.success} size={20} /></View><View style={styles.empty}><StateView type="empty" title="No new notifications" description="There is nothing waiting for your attention right now." /></View></View>
         </View>
     );
 };
@@ -23,43 +19,12 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#111111',
     },
-    header: {
-        height: 70,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        borderBottomWidth: 1,
-        borderBottomColor: '#292929',
-    },
-    menuButton: {
-        width: 45,
-        height: 45,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    menuIcon: {
-        fontSize: 30,
-        color: '#D4AF37',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-        color: '#D4AF37',
-    },
-    headerRight: {
-        width: 45,
-    },
-    content: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    text: {
-        color: '#FFFFFF',
-        fontSize: 18,
-    },
+    content: { flex: 1, padding: spacing.lg },
+    banner: { ...commonStyles.card, alignItems: 'center', flexDirection: 'row', padding: spacing.md },
+    bannerCopy: { flex: 1, marginHorizontal: spacing.md },
+    bannerTitle: { color: colors.text, fontSize: 15, fontWeight: '800' },
+    bannerText: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 3 },
+    empty: { flex: 1, justifyContent: 'center' },
 });
 
 export default NotificationsScreen;

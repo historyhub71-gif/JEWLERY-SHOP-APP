@@ -14,6 +14,8 @@ import SweetAlert from 'react-native-sweet-alert';
 
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { colors, radii, spacing } from '../theme';
+import { Bell, Calculator, ClipboardList, Home, LogOut, Settings, ShieldCheck, Users, UserRound } from 'lucide-react-native';
 
 import SuperAdminDashboardScreen from '../screens/dashboards/SuperAdminDashboardScreen';
 import AdminDashboardScreen from '../screens/dashboards/AdminDashboardScreen';
@@ -32,6 +34,7 @@ const Drawer = createDrawerNavigator();
 const DashboardStack = createNativeStackNavigator();
 
 const CustomDrawerContent = (props: any) => {
+    const { profile } = useAuth();
     const handleLogout = async () => {
         const result = await SweetAlert.showAlert({
             title: 'Logout',
@@ -66,7 +69,9 @@ const CustomDrawerContent = (props: any) => {
     return (
         <DrawerContentScrollView {...props} contentContainerStyle={{ flex: 1 }}>
             <View style={styles.drawerHeader}>
-                <Text style={styles.drawerTitle}>GOLD KING</Text>
+                <Text style={styles.drawerKicker}>THE GOLD STANDARD</Text>
+                <Text style={styles.drawerTitle}>GOLDKING</Text>
+                <Text style={styles.drawerRole}>{profile?.role?.replace('_', ' ').toUpperCase() || 'ACCOUNT'}</Text>
             </View>
 
             <View style={{ flex: 1 }}>
@@ -78,8 +83,9 @@ const CustomDrawerContent = (props: any) => {
                     label="Logout"
                     onPress={handleLogout}
                     labelStyle={styles.logoutLabel}
-                    activeTintColor="#D4AF37"
-                    inactiveTintColor="#FF5252"
+                    icon={({ color, size }) => <LogOut color={color} size={size} />}
+                    activeTintColor={colors.gold}
+                    inactiveTintColor={colors.danger}
                 />
             </View>
         </DrawerContentScrollView>
@@ -143,15 +149,21 @@ const DrawerNavigator = () => {
             screenOptions={{
                 headerShown: false,
                 drawerStyle: {
-                    backgroundColor: '#111111',
-                    width: 290,
+                    backgroundColor: colors.background,
+                    borderRightColor: colors.border,
+                    borderRightWidth: 1,
+                    width: 300,
                 },
-                drawerActiveTintColor: '#D4AF37',
-                drawerInactiveTintColor: '#FFFFFF',
+                drawerActiveBackgroundColor: '#252015',
+                drawerActiveTintColor: colors.gold,
+                drawerInactiveTintColor: colors.textMuted,
                 drawerLabelStyle: {
-                    fontSize: 15,
-                    fontWeight: '600',
+                    fontSize: 14,
+                    fontWeight: '700',
+                    marginLeft: -10,
                 },
+                drawerItemStyle: { borderRadius: radii.sm, marginHorizontal: spacing.sm, marginVertical: 2 },
+                drawerIcon: ({ color, size }) => <Home color={color} size={size} />,
             }}
         >
             <Drawer.Screen
@@ -159,54 +171,70 @@ const DrawerNavigator = () => {
                 component={DashboardStackNavigator}
                 options={{
                     title: drawerTitle,
+                    drawerIcon: ({ color, size }) => <ShieldCheck color={color} size={size} />,
                 }}
             />
 
             {role === 'super_admin' && (
-                <Drawer.Screen name="Admin Management" component={AdminManagementScreen} />
+                <Drawer.Screen name="Admin Management" component={AdminManagementScreen} options={{ drawerIcon: ({ color, size }) => <Users color={color} size={size} /> }} />
             )}
 
             {role === 'super_admin' && (
-                <Drawer.Screen name="Customer Management" component={CustomerManagementScreen} />
+                <Drawer.Screen name="Customer Management" component={CustomerManagementScreen} options={{ drawerIcon: ({ color, size }) => <ClipboardList color={color} size={size} /> }} />
             )}
 
-            <Drawer.Screen name="Profile" component={ProfileScreen} />
+            <Drawer.Screen name="Profile" component={ProfileScreen} options={{ drawerIcon: ({ color, size }) => <UserRound color={color} size={size} /> }} />
 
-            <Drawer.Screen name="Notifications" component={NotificationsScreen} />
+            <Drawer.Screen name="Notifications" component={NotificationsScreen} options={{ drawerIcon: ({ color, size }) => <Bell color={color} size={size} /> }} />
 
-            <Drawer.Screen name="Settings" component={SettingsScreen} />
+            <Drawer.Screen name="Settings" component={SettingsScreen} options={{ drawerIcon: ({ color, size }) => <Settings color={color} size={size} /> }} />
 
-            <Drawer.Screen name="Calculator" component={CalculatorScreen} />
+            <Drawer.Screen name="Calculator" component={CalculatorScreen} options={{ drawerIcon: ({ color, size }) => <Calculator color={color} size={size} /> }} />
         </Drawer.Navigator>
     );
 };
 
 const styles = StyleSheet.create({
     drawerHeader: {
-        height: 150,
-        justifyContent: 'center',
-        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.xl,
         borderBottomWidth: 1,
-        borderBottomColor: '#292929',
-        marginBottom: 10,
+        borderBottomColor: colors.border,
+        marginBottom: spacing.sm,
     },
 
     drawerTitle: {
-        color: '#D4AF37',
-        fontSize: 24,
-        fontWeight: 'bold',
-        letterSpacing: 2,
+        color: colors.gold,
+        fontSize: 26,
+        fontWeight: '900',
+        letterSpacing: 2.5,
+    },
+
+    drawerKicker: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 1.5,
+        marginBottom: spacing.xs,
+    },
+
+    drawerRole: {
+        color: colors.textMuted,
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1,
+        marginTop: spacing.xs,
     },
 
     logoutContainer: {
         borderTopWidth: 1,
-        borderTopColor: '#292929',
-        paddingVertical: 10,
+        borderTopColor: colors.border,
+        paddingVertical: spacing.sm,
     },
 
     logoutLabel: {
-        fontSize: 15,
-        fontWeight: '600',
+        fontSize: 14,
+        fontWeight: '700',
     },
 
     loadingContainer: {

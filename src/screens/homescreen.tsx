@@ -6,6 +6,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import ScreenHeader from './components/ScreenHeader';
+import { colors, spacing } from '../theme';
 
 const HomeScreen = ({ navigation }: any) => {
     const [selectedKarat, setSelectedKarat] = useState('24K');
@@ -50,23 +52,7 @@ const HomeScreen = ({ navigation }: any) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.menuButton}
-                    onPress={() => navigation.openDrawer()}
-                >
-                    <Text style={styles.menuIcon}>☰</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.headerTitle}>GOLD KING</Text>
-
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Text style={styles.backIcon}>✕</Text>
-                </TouchableOpacity>
-            </View>
+            <ScreenHeader title="GOLDKING" subtitle="Jewellery & gold rates" navigation={navigation} back />
 
             <ScrollView
                 style={styles.scrollView}
@@ -289,7 +275,7 @@ const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#111111',
+        backgroundColor: colors.background,
     },
 
     header: {
@@ -338,8 +324,8 @@ const styles = StyleSheet.create({
     },
 
     content: {
-        paddingHorizontal: 18,
-        paddingTop: 25,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
         paddingBottom: 40,
     },
 

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -13,6 +12,9 @@ import {
 
 import SweetAlert from 'react-native-sweet-alert';
 import { supabase } from '../lib/supabase';
+import InputField from './components/InputField';
+import PrimaryButton from './components/PrimaryButton';
+import { colors } from '../theme';
 
 const LoginScreen = ({ navigation }: any) => {
     const [email, setEmail] = useState('');
@@ -32,7 +34,8 @@ const LoginScreen = ({ navigation }: any) => {
             return;
         }
 
-        const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        const emailRegex =
+            /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
         if (!emailRegex.test(email.trim())) {
             await SweetAlert.showAlert({
@@ -59,55 +62,77 @@ const LoginScreen = ({ navigation }: any) => {
         try {
             setLoading(true);
 
-            const { error } = await supabase.auth.signInWithPassword({
-                email: email.trim(),
-                password,
-            });
+            // ----------------------------------------
+            // 1. SUPABASE LOGIN
+            // ----------------------------------------
+            const { data, error } =
+                await supabase.auth.signInWithPassword({
+                    email: email.trim(),
+                    password,
+                });
 
             if (error) {
                 await SweetAlert.showAlert({
                     style: 'error',
                     title: 'Login Failed',
-                    subTitle: error.message || 'Invalid email or password.',
+                    subTitle:
+                        error.message ||
+                        'Invalid email or password.',
                     confirmButtonTitle: 'OK',
                     confirmButtonColor: '#D4AF37',
                 });
+
                 return;
             }
 
-            await SweetAlert.showAlert({
-                style: 'success',
-                title: 'Welcome Back',
-                subTitle: 'You have logged in successfully.',
-                confirmButtonTitle: 'Continue',
-                confirmButtonColor: '#D4AF37',
-            });
-
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-
-            if (!user) {
-                throw new Error('Unable to get logged-in user.');
+            if (!data.session || !data.user) {
+                throw new Error(
+                    'Login succeeded but no active session was created.'
+                );
             }
 
-            const { data: profile, error: profileError } = await supabase
+            const user = data.user;
+
+            // ----------------------------------------
+            // 2. LOAD USER PROFILE
+            // ----------------------------------------
+            const {
+                data: profile,
+                error: profileError,
+            } = await supabase
                 .from('profiles')
                 .select('role, status')
                 .eq('id', user.id)
                 .single();
 
-            if (profileError || !profile) {
-                throw new Error('Your profile could not be found.');
+            if (profileError) {
+                console.error(
+                    'Login profile error:',
+                    profileError
+                );
+
+                throw new Error(
+                    'Your profile could not be loaded.'
+                );
             }
 
+            if (!profile) {
+                throw new Error(
+                    'Your GoldKing profile could not be found.'
+                );
+            }
+
+            // ----------------------------------------
+            // 3. CHECK ACCOUNT STATUS
+            // ----------------------------------------
             if (profile.status !== 'approved') {
                 await supabase.auth.signOut();
 
                 await SweetAlert.showAlert({
                     style: 'warning',
                     title: 'Account Not Approved',
-                    subTitle: 'Your GoldKing account is not approved yet.',
+                    subTitle:
+                        'Your GoldKing account is not approved yet.',
                     confirmButtonTitle: 'OK',
                     confirmButtonColor: '#D4AF37',
                 });
@@ -115,27 +140,52 @@ const LoginScreen = ({ navigation }: any) => {
                 return;
             }
 
-            if (profile.role === 'super_admin') {
-                navigation.replace('Home');
-                return;
+            // ----------------------------------------
+            // 4. CHECK ROLE
+            // ----------------------------------------
+            const validRoles = [
+                'super_admin',
+                'admin',
+                'customer',
+            ];
+
+            if (!validRoles.includes(profile.role)) {
+                await supabase.auth.signOut();
+
+                throw new Error(
+                    'Invalid account role.'
+                );
             }
 
-            if (profile.role === 'admin') {
-                navigation.replace('Home');
-                return;
-            }
+            // ----------------------------------------
+            // 5. SUCCESS
+            // ----------------------------------------
+            await SweetAlert.showAlert({
+                style: 'success',
+                title: 'Welcome Back',
+                subTitle:
+                    'You have logged in successfully.',
+                confirmButtonTitle: 'Continue',
+                confirmButtonColor: '#D4AF37',
+            });
 
-            if (profile.role === 'customer') {
-                navigation.replace('Home');
-                return;
-            }
+            // IMPORTANT:
+            // LoginScreen is inside the ROOT Stack.
+            // The correct authenticated route is "Main".
+            //
+            // Home is NOT a root route.
+            // Home exists inside DashboardStack.
+            navigation.replace('Main');
 
-            throw new Error('Invalid account role.');
         } catch (error: any) {
+            console.error('Login error:', error);
+
             await SweetAlert.showAlert({
                 style: 'error',
                 title: 'Login Failed',
-                subTitle: error?.message || 'Something went wrong. Please try again.',
+                subTitle:
+                    error?.message ||
+                    'Something went wrong. Please try again.',
                 confirmButtonTitle: 'OK',
                 confirmButtonColor: '#D4AF37',
             });
@@ -147,7 +197,11 @@ const LoginScreen = ({ navigation }: any) => {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={
+                Platform.OS === 'ios'
+                    ? 'padding'
+                    : undefined
+            }
         >
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
@@ -155,68 +209,91 @@ const LoginScreen = ({ navigation }: any) => {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.logoSection}>
-                    <Text style={styles.logo}>GOLD KING</Text>
+                    <Text style={styles.logo}>
+                        GOLD KING
+                    </Text>
 
-                    <Text style={styles.logoSubtitle}>Jewellery & Gold</Text>
+                    <Text style={styles.logoSubtitle}>
+                        Jewellery & Gold
+                    </Text>
                 </View>
 
                 <View style={styles.formContainer}>
-                    <Text style={styles.title}>Welcome Back</Text>
+                    <Text style={styles.title}>
+                        Welcome Back
+                    </Text>
 
-                    <Text style={styles.description}>Login to continue to your account</Text>
+                    <Text style={styles.description}>
+                        Login to continue to your account
+                    </Text>
 
-                    <Text style={styles.label}>Email</Text>
-
-                    <TextInput
-                        style={styles.input}
+                    <InputField
+                        label="EMAIL ADDRESS"
                         placeholder="Enter your email"
-                        placeholderTextColor="#777777"
                         value={email}
                         onChangeText={setEmail}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         autoCorrect={false}
+                        editable={!loading}
                     />
 
-                    <Text style={styles.label}>Password</Text>
+                    <Text style={styles.label}>PASSWORD</Text>
 
                     <View style={styles.passwordContainer}>
                         <TextInput
                             style={styles.passwordInput}
                             placeholder="Enter your password"
-                            placeholderTextColor="#777777"
+                            placeholderTextColor={colors.textSubtle}
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry={!showPassword}
                             autoCapitalize="none"
                             autoCorrect={false}
+                            editable={!loading}
                         />
 
                         <TouchableOpacity
                             style={styles.eyeButton}
-                            onPress={() => setShowPassword(!showPassword)}
+                            onPress={() =>
+                                setShowPassword(
+                                    !showPassword
+                                )
+                            }
+                            disabled={loading}
                         >
-                            <Text style={styles.eyeIcon}>{showPassword ? '◉' : '◌'}</Text>
+                            <Text style={styles.eyeIcon}>
+                                {showPassword ? 'HIDE' : 'SHOW'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.loginButton, loading && styles.disabledButton]}
+                    <PrimaryButton
+                        label="SIGN IN"
                         onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator size="small" color="#111111" />
-                        ) : (
-                            <Text style={styles.loginButtonText}>LOGIN</Text>
-                        )}
-                    </TouchableOpacity>
+                        loading={loading}
+                    />
 
                     <View style={styles.registerSection}>
-                        <Text style={styles.registerText}>Don't have an account?</Text>
+                        <Text style={styles.registerText}>
+                            Don't have an account?
+                        </Text>
 
-                        <TouchableOpacity onPress={() => navigation.navigate('Registration')}>
-                            <Text style={styles.registerLink}>Create Account</Text>
+                        <TouchableOpacity
+                            onPress={() =>
+                                navigation.navigate(
+                                    'Registration'
+                                )
+                            }
+                            disabled={loading}
+                        >
+                            <Text
+                                style={
+                                    styles.registerLink
+                                }
+                            >
+                                Create Account
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>

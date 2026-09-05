@@ -169,12 +169,7 @@ const LoginScreen = ({ navigation }: any) => {
                 confirmButtonColor: '#D4AF37',
             });
 
-            // IMPORTANT:
-            // LoginScreen is inside the ROOT Stack.
-            // The correct authenticated route is "Main".
-            //
-            // Home is NOT a root route.
-            // Home exists inside DashboardStack.
+
             navigation.replace('Main');
 
         } catch (error: any) {
@@ -398,7 +393,7 @@ const styles = StyleSheet.create({
 
     eyeIcon: {
         color: '#D4AF37',
-        fontSize: 22,
+        fontSize: 12,
     },
 
     loginButton: {

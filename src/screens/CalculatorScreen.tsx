@@ -4,17 +4,13 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    Switch,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
 
-type CalculatorMode =
-    | 'menu'
-    | 'goldToMoney'
-    | 'moneyToGold'
-    | 'jewelleryPrice'
-    | 'goldPurchase';
+type CalculatorMode = 'menu' | 'goldToMoney' | 'moneyToGold' | 'jewelleryPrice' | 'goldPurchase';
 
 const TOLA_GRAMS = 11.664;
 
@@ -28,6 +24,9 @@ const KARATS = [
 const CalculatorScreen = ({ navigation }: any) => {
     const [mode, setMode] = useState<CalculatorMode>('menu');
 
+    const [metal, setMetal] = useState<'gold' | 'silver'>('gold');
+
+    const [silverRate, setSilverRate] = useState('');
     const [rate24, setRate24] = useState('');
     const [weight, setWeight] = useState('');
     const [money, setMoney] = useState('');
@@ -39,6 +38,7 @@ const CalculatorScreen = ({ navigation }: any) => {
     const [selectedKarat, setSelectedKarat] = useState(24);
 
     const numericRate24 = Number(rate24) || 0;
+    const numericSilverRate = Number(silverRate) || 0;
     const numericWeight = Number(weight) || 0;
     const numericMoney = Number(money) || 0;
     const numericMaking = Number(makingPercent) || 0;
@@ -46,21 +46,25 @@ const CalculatorScreen = ({ navigation }: any) => {
     const numericExtra = Number(extraCharges) || 0;
     const numericDeduction = Number(deductionPercent) || 0;
 
-    const rateForKarat = useMemo(() => {
+    const ratePerTola = useMemo(() => {
+        if (metal === 'silver') {
+            return numericSilverRate;
+        }
+
         return numericRate24 * (selectedKarat / 24);
-    }, [numericRate24, selectedKarat]);
+    }, [metal, numericRate24, numericSilverRate, selectedKarat]);
 
     const ratePerGram = useMemo(() => {
-        return rateForKarat / TOLA_GRAMS;
-    }, [rateForKarat]);
+        return ratePerTola / TOLA_GRAMS;
+    }, [ratePerTola]);
 
-    const goldValue = useMemo(() => {
-        return numericWeight / TOLA_GRAMS * rateForKarat;
-    }, [numericWeight, rateForKarat]);
+    const metalValue = useMemo(() => {
+        return (numericWeight / TOLA_GRAMS) * ratePerTola;
+    }, [numericWeight, ratePerTola]);
 
     const makingValue = useMemo(() => {
-        return goldValue * (numericMaking / 100);
-    }, [goldValue, numericMaking]);
+        return metalValue * (numericMaking / 100);
+    }, [metalValue, numericMaking]);
 
     const wastageWeight = useMemo(() => {
         return numericWeight * (numericWastage / 100);
@@ -71,10 +75,10 @@ const CalculatorScreen = ({ navigation }: any) => {
     }, [wastageWeight, ratePerGram]);
 
     const jewelleryTotal = useMemo(() => {
-        return goldValue + makingValue + wastageValue + numericExtra;
-    }, [goldValue, makingValue, wastageValue, numericExtra]);
+        return metalValue + makingValue + wastageValue + numericExtra;
+    }, [metalValue, makingValue, wastageValue, numericExtra]);
 
-    const moneyToGoldGrams = useMemo(() => {
+    const moneyTometalGrams = useMemo(() => {
         if (ratePerGram <= 0) {
             return 0;
         }
@@ -82,17 +86,17 @@ const CalculatorScreen = ({ navigation }: any) => {
         return numericMoney / ratePerGram;
     }, [numericMoney, ratePerGram]);
 
-    const moneyToGoldTola = useMemo(() => {
-        return moneyToGoldGrams / TOLA_GRAMS;
-    }, [moneyToGoldGrams]);
+    const moneyTometalTola = useMemo(() => {
+        return moneyTometalGrams / TOLA_GRAMS;
+    }, [moneyTometalGrams]);
 
     const purchaseDeduction = useMemo(() => {
-        return goldValue * (numericDeduction / 100);
-    }, [goldValue, numericDeduction]);
+        return metalValue * (numericDeduction / 100);
+    }, [metalValue, numericDeduction]);
 
     const purchaseTotal = useMemo(() => {
-        return goldValue - purchaseDeduction;
-    }, [goldValue, purchaseDeduction]);
+        return metalValue - purchaseDeduction;
+    }, [metalValue, purchaseDeduction]);
 
     const formatMoney = (value: number) => {
         if (!Number.isFinite(value)) {
@@ -100,6 +104,17 @@ const CalculatorScreen = ({ navigation }: any) => {
         }
 
         return `Rs. ${Math.round(value).toLocaleString('en-PK')}`;
+    };
+
+    const formatRate = (value: number) => {
+        if (!Number.isFinite(value)) {
+            return 'Rs. 0.00';
+        }
+
+        return `Rs. ${value.toLocaleString('en-PK', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
     };
 
     const formatNumber = (value: number, decimals = 3) => {
@@ -137,25 +152,36 @@ const CalculatorScreen = ({ navigation }: any) => {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            <TouchableOpacity
-                style={styles.backButton}
-                onPress={goBack}
-                activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.backButton} onPress={goBack} activeOpacity={0.7}>
                 <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
 
             <View style={styles.headerTitleContainer}>
-                <Text style={styles.headerTitle}>
-                    JEWELLER CALCULATOR
-                </Text>
+                <Text style={styles.headerTitle}>JEWELLER CALCULATOR</Text>
 
-                <Text style={styles.headerSubtitle}>
-                    Professional GoldKing Tool
-                </Text>
+                <Text style={styles.headerSubtitle}>Professional GoldKing Tool</Text>
             </View>
 
-            <View style={styles.headerRight} />
+            <View style={styles.metalSwitchContainer}>
+                <Text style={[styles.metalLabel, metal === 'gold' && styles.metalLabelActive]}>
+                    GOLD
+                </Text>
+
+                <Switch
+                    value={metal === 'silver'}
+                    onValueChange={value => setMetal(value ? 'silver' : 'gold')}
+                    trackColor={{
+                        false: '#3A321D',
+                        true: '#3A321D',
+                    }}
+                    thumbColor="#D4AF37"
+                    ios_backgroundColor="#3A321D"
+                />
+
+                <Text style={[styles.metalLabel, metal === 'silver' && styles.metalLabelActive]}>
+                    SILVER
+                </Text>
+            </View>
         </View>
     );
 
@@ -169,8 +195,7 @@ const CalculatorScreen = ({ navigation }: any) => {
                         key={karat.value}
                         style={[
                             styles.karatButton,
-                            selectedKarat === karat.value &&
-                                styles.karatButtonActive,
+                            selectedKarat === karat.value && styles.karatButtonActive,
                         ]}
                         onPress={() => setSelectedKarat(karat.value)}
                         activeOpacity={0.8}
@@ -178,8 +203,7 @@ const CalculatorScreen = ({ navigation }: any) => {
                         <Text
                             style={[
                                 styles.karatText,
-                                selectedKarat === karat.value &&
-                                    styles.karatTextActive,
+                                selectedKarat === karat.value && styles.karatTextActive,
                             ]}
                         >
                             {karat.label}
@@ -210,29 +234,16 @@ const CalculatorScreen = ({ navigation }: any) => {
                     style={styles.input}
                 />
 
-                {suffix ? (
-                    <Text style={styles.inputSuffix}>
-                        {suffix}
-                    </Text>
-                ) : null}
+                {suffix ? <Text style={styles.inputSuffix}>{suffix}</Text> : null}
             </View>
         </View>
     );
 
-    const renderResultRow = (
-        label: string,
-        value: string,
-        highlight = false,
-    ) => (
+    const renderResultRow = (label: string, value: string, highlight = false) => (
         <View style={styles.resultRow}>
             <Text style={styles.resultLabel}>{label}</Text>
 
-            <Text
-                style={[
-                    styles.resultValue,
-                    highlight && styles.resultValueHighlight,
-                ]}
-            >
+            <Text style={[styles.resultValue, highlight && styles.resultValueHighlight]}>
                 {value}
             </Text>
         </View>
@@ -242,8 +253,7 @@ const CalculatorScreen = ({ navigation }: any) => {
         const calculatorModes = [
             {
                 title: 'Gold → Money',
-                description:
-                    'Gold weight ko current rate ke mutabiq money mein calculate karein.',
+                description: 'Gold weight ko current rate ke mutabiq money mein calculate karein.',
                 icon: 'G',
                 target: 'goldToMoney' as CalculatorMode,
             },
@@ -256,15 +266,13 @@ const CalculatorScreen = ({ navigation }: any) => {
             },
             {
                 title: 'Jewellery Price',
-                description:
-                    'Gold + making charges + wastage ke sath final jewellery price.',
+                description: 'Gold + making charges + wastage ke sath final jewellery price.',
                 icon: 'J',
                 target: 'jewelleryPrice' as CalculatorMode,
             },
             {
                 title: 'Gold Purchase',
-                description:
-                    'Customer purchase ka complete gold calculation prepare karein.',
+                description: 'Customer purchase ka complete gold calculation prepare karein.',
                 icon: 'P',
                 target: 'goldPurchase' as CalculatorMode,
             },
@@ -278,13 +286,11 @@ const CalculatorScreen = ({ navigation }: any) => {
                     </View>
 
                     <View style={styles.introTextContainer}>
-                        <Text style={styles.introTitle}>
-                            Jeweller Calculator
-                        </Text>
+                        <Text style={styles.introTitle}>Jeweller Calculator</Text>
 
                         <Text style={styles.introDescription}>
-                            Fast and accurate calculations for everyday
-                            jewellery business operations.
+                            Fast and accurate calculations for everyday jewellery business
+                            operations.
                         </Text>
                     </View>
                 </View>
@@ -292,37 +298,35 @@ const CalculatorScreen = ({ navigation }: any) => {
                 <View style={styles.rateCard}>
                     <View>
                         <Text style={styles.rateLabel}>
-                            STANDARD GOLD RATE
+                            {metal === 'gold' ? 'STANDARD GOLD RATE' : 'STANDARD SILVER RATE'}
                         </Text>
 
                         <Text style={styles.rateValue}>
-                            {rate24
-                                ? formatMoney(numericRate24)
+                            {metal === 'gold'
+                                ? rate24
+                                    ? formatMoney(numericRate24)
+                                    : 'Rs. XXXXX'
+                                : silverRate
+                                ? formatMoney(numericSilverRate)
                                 : 'Rs. XXXXX'}
                         </Text>
 
                         <Text style={styles.rateUnit}>
-                            24K Gold / Tola
+                            {metal === 'gold' ? '24K Gold / Tola' : 'Silver / Tola'}
                         </Text>
                     </View>
 
                     <View style={styles.rateStatus}>
                         <View style={styles.statusDot} />
 
-                        <Text style={styles.statusText}>
-                            Manual Rate
-                        </Text>
+                        <Text style={styles.statusText}>Manual Rate</Text>
                     </View>
                 </View>
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>
-                        Calculate
-                    </Text>
+                    <Text style={styles.sectionTitle}>Calculate</Text>
 
-                    <Text style={styles.sectionSubtitle}>
-                        Select a calculation type
-                    </Text>
+                    <Text style={styles.sectionSubtitle}>Select a calculation type</Text>
                 </View>
 
                 {calculatorModes.map(item => (
@@ -333,19 +337,13 @@ const CalculatorScreen = ({ navigation }: any) => {
                         onPress={() => openMode(item.target)}
                     >
                         <View style={styles.modeIcon}>
-                            <Text style={styles.modeIconText}>
-                                {item.icon}
-                            </Text>
+                            <Text style={styles.modeIconText}>{item.icon}</Text>
                         </View>
 
                         <View style={styles.modeInfo}>
-                            <Text style={styles.modeTitle}>
-                                {item.title}
-                            </Text>
+                            <Text style={styles.modeTitle}>{item.title}</Text>
 
-                            <Text style={styles.modeDescription}>
-                                {item.description}
-                            </Text>
+                            <Text style={styles.modeDescription}>{item.description}</Text>
                         </View>
 
                         <Text style={styles.arrow}>›</Text>
@@ -353,9 +351,7 @@ const CalculatorScreen = ({ navigation }: any) => {
                 ))}
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>
-                        Recent Calculations
-                    </Text>
+                    <Text style={styles.sectionTitle}>Recent Calculations</Text>
 
                     <Text style={styles.sectionSubtitle}>
                         Your latest calculations will appear here.
@@ -365,13 +361,10 @@ const CalculatorScreen = ({ navigation }: any) => {
                 <View style={styles.emptyCard}>
                     <Text style={styles.emptyIcon}>∑</Text>
 
-                    <Text style={styles.emptyTitle}>
-                        No calculations yet
-                    </Text>
+                    <Text style={styles.emptyTitle}>No calculations yet</Text>
 
                     <Text style={styles.emptyText}>
-                        Start a calculation above and your recent
-                        calculations will appear here.
+                        Start a calculation above and your recent calculations will appear here.
                     </Text>
                 </View>
             </>
@@ -388,62 +381,35 @@ const CalculatorScreen = ({ navigation }: any) => {
             </View>
 
             {renderInput(
-                '24K GOLD RATE / TOLA',
-                rate24,
-                setRate24,
-                'e.g. 500000',
+                metal === 'gold' ? '24K GOLD RATE / TOLA' : 'SILVER RATE / TOLA',
+                metal === 'gold' ? rate24 : silverRate,
+                metal === 'gold' ? setRate24 : setSilverRate,
+                metal === 'gold' ? 'e.g. 500000' : 'e.g. 6000',
                 'Rs.',
             )}
 
-            {renderKaratSelector()}
+            {metal === 'gold' && renderKaratSelector()}
 
-            {renderInput(
-                'GOLD WEIGHT',
-                weight,
-                setWeight,
-                'e.g. 2.5',
-                'Tola',
-            )}
+            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 2.5', 'Tola')}
 
             <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>
-                    RATE FOR {selectedKarat}K
-                </Text>
+                <Text style={styles.infoLabel}>RATE FOR {selectedKarat}K</Text>
 
-                <Text style={styles.infoValue}>
-                    {formatMoney(rateForKarat)} / Tola
-                </Text>
+                <Text style={styles.infoValue}>{formatMoney(ratePerTola)} / Tola</Text>
 
-                <Text style={styles.infoSubValue}>
-                    {formatMoney(ratePerGram)} / Gram
-                </Text>
+                <Text style={styles.infoSubValue}>{formatRate(ratePerGram)} / Gram</Text>
             </View>
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>
-                    CALCULATION RESULT
-                </Text>
+                <Text style={styles.resultTitle}>CALCULATION RESULT</Text>
 
-                {renderResultRow(
-                    'Gold Weight',
-                    `${formatNumber(numericWeight)} Tola`,
-                )}
+                {renderResultRow('Gold Weight', `${formatNumber(numericWeight)} Tola`)}
 
-                {renderResultRow(
-                    'Gold Weight',
-                    `${formatNumber(numericWeight * TOLA_GRAMS)} Gram`,
-                )}
+                {renderResultRow('Gold Weight', `${formatNumber(numericWeight * TOLA_GRAMS)} Gram`)}
 
-                {renderResultRow(
-                    'Purity',
-                    `${selectedKarat}K`,
-                )}
+                {renderResultRow('Purity', `${selectedKarat}K`)}
 
-                {renderResultRow(
-                    'Gold Value',
-                    formatMoney(goldValue),
-                    true,
-                )}
+                {renderResultRow('Gold Value', formatMoney(metalValue), true)}
             </View>
         </>
     );
@@ -457,64 +423,30 @@ const CalculatorScreen = ({ navigation }: any) => {
                 </Text>
             </View>
 
-            {renderInput(
-                '24K GOLD RATE / TOLA',
-                rate24,
-                setRate24,
-                'e.g. 500000',
-                'Rs.',
-            )}
+            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
 
-            {renderKaratSelector()}
+            {metal === 'gold' && renderKaratSelector()}
 
-            {renderInput(
-                'AVAILABLE MONEY',
-                money,
-                setMoney,
-                'e.g. 250000',
-                'Rs.',
-            )}
+            {renderInput('AVAILABLE MONEY', money, setMoney, 'e.g. 250000', 'Rs.')}
 
             <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>
-                    RATE FOR {selectedKarat}K
-                </Text>
+                <Text style={styles.infoLabel}>RATE FOR {selectedKarat}K</Text>
 
-                <Text style={styles.infoValue}>
-                    {formatMoney(rateForKarat)} / Tola
-                </Text>
+                <Text style={styles.infoValue}>{formatMoney(ratePerTola)} / Tola</Text>
 
-                <Text style={styles.infoSubValue}>
-                    {formatMoney(ratePerGram)} / Gram
-                </Text>
+                <Text style={styles.infoSubValue}>{formatRate(ratePerGram)} / Gram</Text>
             </View>
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>
-                    GOLD YOU CAN BUY
-                </Text>
+                <Text style={styles.resultTitle}>GOLD YOU CAN BUY</Text>
 
-                {renderResultRow(
-                    'Available Money',
-                    formatMoney(numericMoney),
-                )}
+                {renderResultRow('Available Money', formatMoney(numericMoney))}
 
-                {renderResultRow(
-                    'Gold Weight',
-                    `${formatNumber(moneyToGoldGrams)} Gram`,
-                    true,
-                )}
+                {renderResultRow('Gold Weight', `${formatNumber(moneyTometalGrams)} Gram`, true)}
 
-                {renderResultRow(
-                    'Gold Weight',
-                    `${formatNumber(moneyToGoldTola)} Tola`,
-                    true,
-                )}
+                {renderResultRow('Gold Weight', `${formatNumber(moneyTometalTola)} Tola`, true)}
 
-                {renderResultRow(
-                    'Purity',
-                    `${selectedKarat}K`,
-                )}
+                {renderResultRow('Purity', `${selectedKarat}K`)}
             </View>
         </>
     );
@@ -524,44 +456,20 @@ const CalculatorScreen = ({ navigation }: any) => {
             <View style={styles.toolIntro}>
                 <Text style={styles.toolTitle}>Jewellery Price</Text>
                 <Text style={styles.toolDescription}>
-                    Gold, making, wastage aur additional charges ke sath final
-                    price calculate karein.
+                    Gold, making, wastage aur additional charges ke sath final price calculate
+                    karein.
                 </Text>
             </View>
 
-            {renderInput(
-                '24K GOLD RATE / TOLA',
-                rate24,
-                setRate24,
-                'e.g. 500000',
-                'Rs.',
-            )}
+            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
 
-            {renderKaratSelector()}
+            {metal === 'gold' && renderKaratSelector()}
 
-            {renderInput(
-                'GOLD WEIGHT',
-                weight,
-                setWeight,
-                'e.g. 1.5',
-                'Tola',
-            )}
+            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 1.5', 'Tola')}
 
-            {renderInput(
-                'MAKING CHARGES',
-                makingPercent,
-                setMakingPercent,
-                'e.g. 8',
-                '%',
-            )}
+            {renderInput('MAKING CHARGES', makingPercent, setMakingPercent, 'e.g. 8', '%')}
 
-            {renderInput(
-                'WASTAGE / KASS',
-                wastagePercent,
-                setWastagePercent,
-                'e.g. 5',
-                '%',
-            )}
+            {renderInput('WASTAGE / KASS', wastagePercent, setWastagePercent, 'e.g. 5', '%')}
 
             {renderInput(
                 'STONES / OTHER CHARGES',
@@ -572,42 +480,21 @@ const CalculatorScreen = ({ navigation }: any) => {
             )}
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>
-                    JEWELLERY QUOTATION
-                </Text>
+                <Text style={styles.resultTitle}>JEWELLERY QUOTATION</Text>
 
-                {renderResultRow(
-                    'Gold Value',
-                    formatMoney(goldValue),
-                )}
+                {renderResultRow('Gold Value', formatMoney(metalValue))}
 
-                {renderResultRow(
-                    'Making Charges',
-                    formatMoney(makingValue),
-                )}
+                {renderResultRow('Making Charges', formatMoney(makingValue))}
 
-                {renderResultRow(
-                    'Wastage Weight',
-                    `${formatNumber(wastageWeight)} Gram`,
-                )}
+                {renderResultRow('Wastage Weight', `${formatNumber(wastageWeight)} Gram`)}
 
-                {renderResultRow(
-                    'Wastage Value',
-                    formatMoney(wastageValue),
-                )}
+                {renderResultRow('Wastage Value', formatMoney(wastageValue))}
 
-                {renderResultRow(
-                    'Other Charges',
-                    formatMoney(numericExtra),
-                )}
+                {renderResultRow('Other Charges', formatMoney(numericExtra))}
 
                 <View style={styles.resultDivider} />
 
-                {renderResultRow(
-                    'FINAL PRICE',
-                    formatMoney(jewelleryTotal),
-                    true,
-                )}
+                {renderResultRow('FINAL PRICE', formatMoney(jewelleryTotal), true)}
             </View>
         </>
     );
@@ -617,28 +504,16 @@ const CalculatorScreen = ({ navigation }: any) => {
             <View style={styles.toolIntro}>
                 <Text style={styles.toolTitle}>Gold Purchase</Text>
                 <Text style={styles.toolDescription}>
-                    Customer se gold purchase karte waqt deduction ke baad
-                    payable amount calculate karein.
+                    Customer se gold purchase karte waqt deduction ke baad payable amount calculate
+                    karein.
                 </Text>
             </View>
 
-            {renderInput(
-                '24K GOLD RATE / TOLA',
-                rate24,
-                setRate24,
-                'e.g. 500000',
-                'Rs.',
-            )}
+            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
 
-            {renderKaratSelector()}
+            {metal === 'gold' && renderKaratSelector()}
 
-            {renderInput(
-                'GOLD WEIGHT',
-                weight,
-                setWeight,
-                'e.g. 2',
-                'Tola',
-            )}
+            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 2', 'Tola')}
 
             {renderInput(
                 'PURCHASE DEDUCTION',
@@ -649,37 +524,19 @@ const CalculatorScreen = ({ navigation }: any) => {
             )}
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>
-                    PURCHASE RESULT
-                </Text>
+                <Text style={styles.resultTitle}>PURCHASE RESULT</Text>
 
-                {renderResultRow(
-                    'Gold Weight',
-                    `${formatNumber(numericWeight)} Tola`,
-                )}
+                {renderResultRow('Gold Weight', `${formatNumber(numericWeight)} Tola`)}
 
-                {renderResultRow(
-                    'Gross Gold Value',
-                    formatMoney(goldValue),
-                )}
+                {renderResultRow('Gross Gold Value', formatMoney(metalValue))}
 
-                {renderResultRow(
-                    'Deduction',
-                    `${numericDeduction}%`,
-                )}
+                {renderResultRow('Deduction', `${numericDeduction}%`)}
 
-                {renderResultRow(
-                    'Deduction Amount',
-                    formatMoney(purchaseDeduction),
-                )}
+                {renderResultRow('Deduction Amount', formatMoney(purchaseDeduction))}
 
                 <View style={styles.resultDivider} />
 
-                {renderResultRow(
-                    'PAYABLE AMOUNT',
-                    formatMoney(purchaseTotal),
-                    true,
-                )}
+                {renderResultRow('PAYABLE AMOUNT', formatMoney(purchaseTotal), true)}
             </View>
         </>
     );
@@ -698,7 +555,6 @@ const CalculatorScreen = ({ navigation }: any) => {
                 {mode === 'goldToMoney' && renderGoldToMoney()}
 
                 {mode === 'moneyToGold' && renderMoneyToGold()}
-
                 {mode === 'jewelleryPrice' && renderJewelleryPrice()}
 
                 {mode === 'goldPurchase' && renderGoldPurchase()}
@@ -709,9 +565,7 @@ const CalculatorScreen = ({ navigation }: any) => {
                         onPress={resetFields}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.resetButtonText}>
-                            CLEAR CALCULATION
-                        </Text>
+                        <Text style={styles.resetButtonText}>CLEAR CALCULATION</Text>
                     </TouchableOpacity>
                 )}
             </ScrollView>
@@ -766,8 +620,21 @@ const styles = StyleSheet.create({
         marginTop: 3,
     },
 
-    headerRight: {
-        width: 45,
+    metalSwitchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+    },
+
+    metalLabel: {
+        color: '#666666',
+        fontSize: 8,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+
+    metalLabelActive: {
+        color: '#D4AF37',
     },
 
     content: {

@@ -1,72 +1,168 @@
-import React, { useState } from 'react';
-import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ScreenHeader from './components/ScreenHeader';
+import { supabase } from '../lib/supabase';
 import { colors, spacing } from '../theme';
+
+type MetalRate = {
+    metal: 'gold' | 'silver';
+    purity: number;
+    rate_per_gram: number;
+    rate_per_tola: number;
+    currency: string;
+    source: string;
+    source_updated_at: string | null;
+    updated_at: string;
+};
+
+const GOLD_KARATS = ['24K', '22K', '21K', '18K'];
 
 const HomeScreen = ({ navigation }: any) => {
     const [selectedKarat, setSelectedKarat] = useState('24K');
     const [goldUnit, setGoldUnit] = useState('Tola');
     const [silverUnit, setSilverUnit] = useState('Tola');
 
-    // Temporary rates
-    // API connect hone ke baad ye values API se aayengi.
-    const goldRates: any = {
-        '24K': {
-            tola: '520,000',
-            gram: '44,585',
-        },
-        '22K': {
-            tola: '476,667',
-            gram: '40,857',
-        },
-        '21K': {
-            tola: '455,000',
-            gram: '39,000',
-        },
-        '18K': {
-            tola: '390,000',
-            gram: '33,429',
-        },
+    const [metalRates, setMetalRates] = useState<MetalRate[]>([]);
+    const [loadingRates, setLoadingRates] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [ratesError, setRatesError] = useState('');
+
+    const fetchMetalRates = async (isRefresh = false) => {
+        try {
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoadingRates(true);
+            }
+
+            setRatesError('');
+
+            const { data, error } = await supabase
+                .from('metal_rates')
+                .select(
+                    'metal,purity,rate_per_gram,rate_per_tola,currency,source,source_updated_at,updated_at',
+                )
+                .in('metal', ['gold', 'silver'])
+                .order('metal')
+                .order('purity', { ascending: false });
+
+            if (error) {
+                throw error;
+            }
+
+            setMetalRates((data ?? []) as MetalRate[]);
+        } catch (error) {
+            console.error('HomeScreen rate fetch error:', error);
+            setRatesError('Unable to load latest rates.');
+        } finally {
+            setLoadingRates(false);
+            setRefreshing(false);
+        }
     };
 
-    const silverRates: any = {
-        tola: '6,200',
-        gram: '531',
+    useEffect(() => {
+        fetchMetalRates();
+    }, []);
+
+    const goldRates = useMemo(() => {
+        return {
+            '24K': metalRates.find(rate => rate.metal === 'gold' && rate.purity === 24),
+            '22K': metalRates.find(rate => rate.metal === 'gold' && rate.purity === 22),
+            '21K': metalRates.find(rate => rate.metal === 'gold' && rate.purity === 21),
+            '18K': metalRates.find(rate => rate.metal === 'gold' && rate.purity === 18),
+        };
+    }, [metalRates]);
+
+    const silverRate = useMemo(() => {
+        return metalRates.find(rate => rate.metal === 'silver' && rate.purity === 999);
+    }, [metalRates]);
+
+    const selectedGoldRate = useMemo(() => {
+        const rate = goldRates[selectedKarat as keyof typeof goldRates];
+
+        if (!rate) {
+            return null;
+        }
+
+        return goldUnit === 'Tola' ? rate.rate_per_tola : rate.rate_per_gram;
+    }, [goldRates, selectedKarat, goldUnit]);
+
+    const selectedSilverRate = useMemo(() => {
+        if (!silverRate) {
+            return null;
+        }
+
+        return silverUnit === 'Tola' ? silverRate.rate_per_tola : silverRate.rate_per_gram;
+    }, [silverRate, silverUnit]);
+
+    const latestUpdatedAt = useMemo(() => {
+        if (!metalRates.length) {
+            return null;
+        }
+
+        const timestamps = metalRates
+            .map(rate => rate.source_updated_at || rate.updated_at)
+            .filter(Boolean)
+            .map(value => new Date(value).getTime())
+            .filter(value => Number.isFinite(value));
+
+        if (!timestamps.length) {
+            return null;
+        }
+
+        return new Date(Math.max(...timestamps));
+    }, [metalRates]);
+
+    const formatRate = (value: number | null) => {
+        if (value === null || !Number.isFinite(value)) {
+            return '—';
+        }
+
+        return Math.round(value).toLocaleString('en-PK');
     };
 
-    const selectedGoldRate =
-        goldUnit === 'Tola'
-            ? goldRates[selectedKarat].tola
-            : goldRates[selectedKarat].gram;
+    const formatUpdatedTime = () => {
+        if (!latestUpdatedAt) {
+            return '';
+        }
 
-    const selectedSilverRate =
-        silverUnit === 'Tola'
-            ? silverRates.tola
-            : silverRates.gram;
+        return latestUpdatedAt.toLocaleString('en-PK', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
 
     return (
         <View style={styles.container}>
-            <ScreenHeader title="GOLDKING" subtitle="Jewellery & gold rates" navigation={navigation} back />
+            <ScreenHeader
+                title="GOLDKING"
+                subtitle="Jewellery & gold rates"
+                navigation={navigation}
+                back
+            />
 
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => fetchMetalRates(true)}
+                        tintColor="#D4AF37"
+                        colors={['#D4AF37']}
+                    />
+                }
             >
                 <View style={styles.welcomeSection}>
                     <Text style={styles.welcome}>Welcome to</Text>
 
                     <Text style={styles.title}>GOLD KING</Text>
 
-                    <Text style={styles.subtitle}>
-                        Jewellery & Gold
-                    </Text>
+                    <Text style={styles.subtitle}>Jewellery & Gold</Text>
                 </View>
 
                 {/* GOLD RATES */}
@@ -74,11 +170,9 @@ const HomeScreen = ({ navigation }: any) => {
                     <View style={styles.cardHeader}>
                         <View>
                             <Text style={styles.cardTitle}>GOLD RATES</Text>
-                            <Text style={styles.cardSubtitle}>
-                                Select gold purity
-                            </Text>
-                        </View>
 
+                            <Text style={styles.cardSubtitle}>Select gold purity</Text>
+                        </View>
                         
                     </View>
 
@@ -87,21 +181,20 @@ const HomeScreen = ({ navigation }: any) => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.karatContainer}
                     >
-                        {['24K', '22K', '21K', '18K'].map(karat => (
+                        {GOLD_KARATS.map(karat => (
                             <TouchableOpacity
                                 key={karat}
                                 style={[
                                     styles.karatButton,
-                                    selectedKarat === karat &&
-                                        styles.selectedKaratButton,
+                                    selectedKarat === karat && styles.selectedKaratButton,
                                 ]}
                                 onPress={() => setSelectedKarat(karat)}
+                                activeOpacity={0.8}
                             >
                                 <Text
                                     style={[
                                         styles.karatText,
-                                        selectedKarat === karat &&
-                                            styles.selectedKaratText,
+                                        selectedKarat === karat && styles.selectedKaratText,
                                     ]}
                                 >
                                     {karat}
@@ -111,33 +204,28 @@ const HomeScreen = ({ navigation }: any) => {
                     </ScrollView>
 
                     <View style={styles.selectedInfo}>
-                        <Text style={styles.selectedLabel}>
-                            {selectedKarat} GOLD
-                        </Text>
+                        <Text style={styles.selectedLabel}>{selectedKarat} GOLD</Text>
 
                         <Text style={styles.rateValue}>
-                            Rs. {selectedGoldRate}
+                            {loadingRates ? 'Loading...' : `Rs. ${formatRate(selectedGoldRate)}`}
                         </Text>
 
-                        <Text style={styles.unitLabel}>
-                            Per {goldUnit}
-                        </Text>
+                        <Text style={styles.unitLabel}>Per {goldUnit}</Text>
                     </View>
 
                     <View style={styles.unitSelector}>
                         <TouchableOpacity
                             style={[
                                 styles.unitButton,
-                                goldUnit === 'Tola' &&
-                                    styles.selectedUnitButton,
+                                goldUnit === 'Tola' && styles.selectedUnitButton,
                             ]}
                             onPress={() => setGoldUnit('Tola')}
+                            activeOpacity={0.8}
                         >
                             <Text
                                 style={[
                                     styles.unitText,
-                                    goldUnit === 'Tola' &&
-                                        styles.selectedUnitText,
+                                    goldUnit === 'Tola' && styles.selectedUnitText,
                                 ]}
                             >
                                 PER TOLA
@@ -147,16 +235,15 @@ const HomeScreen = ({ navigation }: any) => {
                         <TouchableOpacity
                             style={[
                                 styles.unitButton,
-                                goldUnit === 'Gram' &&
-                                    styles.selectedUnitButton,
+                                goldUnit === 'Gram' && styles.selectedUnitButton,
                             ]}
                             onPress={() => setGoldUnit('Gram')}
+                            activeOpacity={0.8}
                         >
                             <Text
                                 style={[
                                     styles.unitText,
-                                    goldUnit === 'Gram' &&
-                                        styles.selectedUnitText,
+                                    goldUnit === 'Gram' && styles.selectedUnitText,
                                 ]}
                             >
                                 PER GRAM
@@ -170,42 +257,34 @@ const HomeScreen = ({ navigation }: any) => {
                     <View style={styles.cardHeader}>
                         <View>
                             <Text style={styles.cardTitle}>SILVER RATES</Text>
-                            <Text style={styles.cardSubtitle}>
-                                Current silver price
-                            </Text>
+
+                            <Text style={styles.cardSubtitle}>Current silver price</Text>
                         </View>
-
-
                     </View>
 
                     <View style={styles.selectedInfo}>
-                        <Text style={styles.selectedLabel}>
-                            SILVER
-                        </Text>
+                        <Text style={styles.selectedLabel}>SILVER</Text>
 
                         <Text style={styles.rateValue}>
-                            Rs. {selectedSilverRate}
+                            {loadingRates ? 'Loading...' : `Rs. ${formatRate(selectedSilverRate)}`}
                         </Text>
 
-                        <Text style={styles.unitLabel}>
-                            Per {silverUnit}
-                        </Text>
+                        <Text style={styles.unitLabel}>Per {silverUnit}</Text>
                     </View>
 
                     <View style={styles.unitSelector}>
                         <TouchableOpacity
                             style={[
                                 styles.unitButton,
-                                silverUnit === 'Tola' &&
-                                    styles.selectedUnitButton,
+                                silverUnit === 'Tola' && styles.selectedUnitButton,
                             ]}
                             onPress={() => setSilverUnit('Tola')}
+                            activeOpacity={0.8}
                         >
                             <Text
                                 style={[
                                     styles.unitText,
-                                    silverUnit === 'Tola' &&
-                                        styles.selectedUnitText,
+                                    silverUnit === 'Tola' && styles.selectedUnitText,
                                 ]}
                             >
                                 PER TOLA
@@ -215,16 +294,15 @@ const HomeScreen = ({ navigation }: any) => {
                         <TouchableOpacity
                             style={[
                                 styles.unitButton,
-                                silverUnit === 'Gram' &&
-                                    styles.selectedUnitButton,
+                                silverUnit === 'Gram' && styles.selectedUnitButton,
                             ]}
                             onPress={() => setSilverUnit('Gram')}
+                            activeOpacity={0.8}
                         >
                             <Text
                                 style={[
                                     styles.unitText,
-                                    silverUnit === 'Gram' &&
-                                        styles.selectedUnitText,
+                                    silverUnit === 'Gram' && styles.selectedUnitText,
                                 ]}
                             >
                                 PER GRAM
@@ -238,7 +316,7 @@ const HomeScreen = ({ navigation }: any) => {
                     <View style={styles.infoHeader}>
                         <Text style={styles.infoTitle}>RATE INFORMATION</Text>
 
-                        <View style={styles.liveDot} />
+                        <View style={[styles.liveDot, ratesError && styles.liveDotError]} />
                     </View>
 
                     <View style={styles.infoRow}>
@@ -252,21 +330,31 @@ const HomeScreen = ({ navigation }: any) => {
                     <View style={styles.infoRow}>
                         <Text style={styles.infoLabel}>Silver</Text>
 
-                        <Text style={styles.infoValue}>
-                            Per {silverUnit}
-                        </Text>
+                        <Text style={styles.infoValue}>Per {silverUnit}</Text>
                     </View>
 
                     <View style={styles.divider} />
 
-                    <Text style={styles.updateText}>
-                        Rates will be updated automatically when live API is connected.
-                    </Text>
+                    {ratesError ? (
+                        <Text style={styles.updateText}>{ratesError}</Text>
+                    ) : loadingRates ? (
+                        <Text style={styles.updateText}>Loading latest market rates...</Text>
+                    ) : (
+                        <>
+                            <Text style={styles.updateText}>
+                                Live rates are synced automatically from GoldKing market data.
+                            </Text>
+
+                            {latestUpdatedAt ? (
+                                <Text style={styles.updatedAtText}>
+                                    Last updated: {formatUpdatedTime()}
+                                </Text>
+                            ) : null}
+                        </>
+                    )}
                 </View>
 
-                <Text style={styles.footerText}>
-                    GOLD KING • Jewellery & Gold
-                </Text>
+                <Text style={styles.footerText}>GOLD KING • Jewellery & Gold</Text>
             </ScrollView>
         </View>
     );
@@ -276,47 +364,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
-    },
-
-    header: {
-        height: 70,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        borderBottomWidth: 1,
-        borderBottomColor: '#292929',
-    },
-
-    menuButton: {
-        width: 45,
-        height: 45,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    menuIcon: {
-        fontSize: 30,
-        color: '#D4AF37',
-    },
-
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-        color: '#D4AF37',
-    },
-
-    backButton: {
-        width: 45,
-        height: 45,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    backIcon: {
-        fontSize: 28,
-        color: '#D4AF37',
     },
 
     scrollView: {
@@ -382,19 +429,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 4,
     },
-
-
-    
-    silverIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#C0C0C0',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-
 
     karatContainer: {
         gap: 8,
@@ -517,6 +551,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#55C878',
     },
 
+    liveDotError: {
+        backgroundColor: '#C85A5A',
+    },
+
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -546,6 +584,14 @@ const styles = StyleSheet.create({
         fontSize: 11,
         lineHeight: 17,
         textAlign: 'center',
+    },
+
+    updatedAtText: {
+        color: '#555555',
+        fontSize: 10,
+        lineHeight: 16,
+        textAlign: 'center',
+        marginTop: 5,
     },
 
     footerText: {

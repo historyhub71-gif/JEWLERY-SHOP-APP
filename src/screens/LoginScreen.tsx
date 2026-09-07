@@ -159,7 +159,6 @@ const LoginScreen = ({ navigation }: any) => {
 
             // ----------------------------------------
             // 5. SUCCESS
-            // ----------------------------------------
             await SweetAlert.showAlert({
                 style: 'success',
                 title: 'Welcome Back',

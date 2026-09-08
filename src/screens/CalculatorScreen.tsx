@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    ActivityIndicator,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -10,7 +12,28 @@ import {
     View,
 } from 'react-native';
 
-type CalculatorMode = 'menu' | 'goldToMoney' | 'moneyToGold' | 'jewelleryPrice' | 'goldPurchase';
+import { supabase } from '../lib/supabase';
+
+type CalculatorMode =
+    | 'menu'
+    | 'goldToMoney'
+    | 'moneyToGold'
+    | 'jewelleryPrice'
+    | 'goldPurchase';
+
+type Metal = 'gold' | 'silver';
+
+type MetalRate = {
+    id: string;
+    metal: Metal;
+    purity: number;
+    rate_per_gram: number;
+    rate_per_tola: number;
+    currency: string;
+    source: string;
+    source_updated_at: string | null;
+    updated_at: string;
+};
 
 const TOLA_GRAMS = 11.664;
 
@@ -24,10 +47,12 @@ const KARATS = [
 const CalculatorScreen = ({ navigation }: any) => {
     const [mode, setMode] = useState<CalculatorMode>('menu');
 
-    const [metal, setMetal] = useState<'gold' | 'silver'>('gold');
+    const [metal, setMetal] = useState<Metal>('gold');
 
-    const [silverRate, setSilverRate] = useState('');
-    const [rate24, setRate24] = useState('');
+    const [metalRates, setMetalRates] = useState<MetalRate[]>([]);
+    const [loadingRates, setLoadingRates] = useState(true);
+    const [ratesError, setRatesError] = useState('');
+
     const [weight, setWeight] = useState('');
     const [money, setMoney] = useState('');
     const [makingPercent, setMakingPercent] = useState('');
@@ -37,8 +62,6 @@ const CalculatorScreen = ({ navigation }: any) => {
 
     const [selectedKarat, setSelectedKarat] = useState(24);
 
-    const numericRate24 = Number(rate24) || 0;
-    const numericSilverRate = Number(silverRate) || 0;
     const numericWeight = Number(weight) || 0;
     const numericMoney = Number(money) || 0;
     const numericMaking = Number(makingPercent) || 0;
@@ -46,17 +69,83 @@ const CalculatorScreen = ({ navigation }: any) => {
     const numericExtra = Number(extraCharges) || 0;
     const numericDeduction = Number(deductionPercent) || 0;
 
-    const ratePerTola = useMemo(() => {
-        if (metal === 'silver') {
-            return numericSilverRate;
+    /**
+     * Fetch latest rates already stored in Supabase.
+     *
+     * HomeScreen is responsible for refreshing live API rates.
+     * Calculator reads the same central `metal_rates` table.
+     */
+    const fetchMetalRates = async () => {
+        try {
+            setLoadingRates(true);
+            setRatesError('');
+
+            const { data, error } = await supabase
+                .from('metal_rates')
+                .select(
+                    'id, metal, purity, rate_per_gram, rate_per_tola, currency, source, source_updated_at, updated_at',
+                )
+                .order('metal')
+                .order('purity', { ascending: false });
+
+            if (error) {
+                throw error;
+            }
+
+            setMetalRates((data as MetalRate[]) || []);
+        } catch (error: any) {
+            console.error('Calculator rate fetch error:', error);
+
+            setRatesError(
+                error?.message || 'Unable to load live rates.',
+            );
+        } finally {
+            setLoadingRates(false);
         }
+    };
 
-        return numericRate24 * (selectedKarat / 24);
-    }, [metal, numericRate24, numericSilverRate, selectedKarat]);
+    useEffect(() => {
+        fetchMetalRates();
+    }, []);
 
-    const ratePerGram = useMemo(() => {
-        return ratePerTola / TOLA_GRAMS;
-    }, [ratePerTola]);
+    const goldRate = useMemo(() => {
+        return (
+            metalRates.find(
+                rate =>
+                    rate.metal === 'gold' &&
+                    Number(rate.purity) === selectedKarat,
+            ) || null
+        );
+    }, [metalRates, selectedKarat]);
+
+    const silverRate = useMemo(() => {
+        return (
+            metalRates.find(
+                rate =>
+                    rate.metal === 'silver' &&
+                    Number(rate.purity) === 999,
+            ) || null
+        );
+    }, [metalRates]);
+
+    /**
+     * This is the actual selected metal rate from Supabase.
+     *
+     * Gold:
+     *   selectedKarat directly maps to 24K/22K/21K/18K row.
+     *
+     * Silver:
+     *   999 purity row is used.
+     */
+    const selectedRate = metal === 'gold' ? goldRate : silverRate;
+
+    const ratePerTola = selectedRate
+        ? Number(selectedRate.rate_per_tola) || 0
+        : 0;
+
+    const ratePerGram = selectedRate
+        ? Number(selectedRate.rate_per_gram) || 0
+        : 0;
 
     const metalValue = useMemo(() => {
         return (numericWeight / TOLA_GRAMS) * ratePerTola;
@@ -126,7 +215,6 @@ const CalculatorScreen = ({ navigation }: any) => {
     };
 
     const resetFields = () => {
-        setRate24('');
         setWeight('');
         setMoney('');
         setMakingPercent('');
@@ -152,24 +240,39 @@ const CalculatorScreen = ({ navigation }: any) => {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={goBack} activeOpacity={0.7}>
+            <TouchableOpacity
+                style={styles.backButton}
+                onPress={goBack}
+                activeOpacity={0.7}
+            >
                 <Text style={styles.backIcon}>‹</Text>
             </TouchableOpacity>
 
             <View style={styles.headerTitleContainer}>
-                <Text style={styles.headerTitle}>JEWELLER CALCULATOR</Text>
+                <Text style={styles.headerTitle}>
+                    JEWELLER CALCULATOR
+                </Text>
 
-                <Text style={styles.headerSubtitle}>Professional GoldKing Tool</Text>
+                <Text style={styles.headerSubtitle}>
+                    Professional GoldKing Tool
+                </Text>
             </View>
 
             <View style={styles.metalSwitchContainer}>
-                <Text style={[styles.metalLabel, metal === 'gold' && styles.metalLabelActive]}>
+                <Text
+                    style={[
+                        styles.metalLabel,
+                        metal === 'gold' && styles.metalLabelActive,
+                    ]}
+                >
                     GOLD
                 </Text>
 
                 <Switch
                     value={metal === 'silver'}
-                    onValueChange={value => setMetal(value ? 'silver' : 'gold')}
+                    onValueChange={value =>
+                        setMetal(value ? 'silver' : 'gold')
+                    }
                     trackColor={{
                         false: '#3A321D',
                         true: '#3A321D',
@@ -178,41 +281,56 @@ const CalculatorScreen = ({ navigation }: any) => {
                     ios_backgroundColor="#3A321D"
                 />
 
-                <Text style={[styles.metalLabel, metal === 'silver' && styles.metalLabelActive]}>
+                <Text
+                    style={[
+                        styles.metalLabel,
+                        metal === 'silver' && styles.metalLabelActive,
+                    ]}
+                >
                     SILVER
                 </Text>
             </View>
         </View>
     );
 
-    const renderKaratSelector = () => (
-        <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>GOLD PURITY</Text>
+    const renderKaratSelector = () => {
+        if (metal === 'silver') {
+            return null;
+        }
 
-            <View style={styles.karatRow}>
-                {KARATS.map(karat => (
-                    <TouchableOpacity
-                        key={karat.value}
-                        style={[
-                            styles.karatButton,
-                            selectedKarat === karat.value && styles.karatButtonActive,
-                        ]}
-                        onPress={() => setSelectedKarat(karat.value)}
-                        activeOpacity={0.8}
-                    >
-                        <Text
+        return (
+            <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>GOLD PURITY</Text>
+
+                <View style={styles.karatRow}>
+                    {KARATS.map(karat => (
+                        <TouchableOpacity
+                            key={karat.value}
                             style={[
-                                styles.karatText,
-                                selectedKarat === karat.value && styles.karatTextActive,
+                                styles.karatButton,
+                                selectedKarat === karat.value &&
+                                    styles.karatButtonActive,
                             ]}
+                            onPress={() =>
+                                setSelectedKarat(karat.value)
+                            }
+                            activeOpacity={0.8}
                         >
-                            {karat.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text
+                                style={[
+                                    styles.karatText,
+                                    selectedKarat === karat.value &&
+                                        styles.karatTextActive,
+                                ]}
+                            >
+                                {karat.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderInput = (
         label: string,
@@ -234,17 +352,105 @@ const CalculatorScreen = ({ navigation }: any) => {
                     style={styles.input}
                 />
 
-                {suffix ? <Text style={styles.inputSuffix}>{suffix}</Text> : null}
+                {suffix ? (
+                    <Text style={styles.inputSuffix}>{suffix}</Text>
+                ) : null}
             </View>
         </View>
     );
 
-    const renderResultRow = (label: string, value: string, highlight = false) => (
+    const renderResultRow = (
+        label: string,
+        value: string,
+        highlight = false,
+    ) => (
         <View style={styles.resultRow}>
             <Text style={styles.resultLabel}>{label}</Text>
 
-            <Text style={[styles.resultValue, highlight && styles.resultValueHighlight]}>
+            <Text
+                style={[
+                    styles.resultValue,
+                    highlight && styles.resultValueHighlight,
+                ]}
+            >
                 {value}
+            </Text>
+        </View>
+    );
+
+    const renderLiveRateCard = () => (
+        <View style={styles.rateCard}>
+            {loadingRates ? (
+                <View style={styles.rateLoadingContainer}>
+                    <ActivityIndicator
+                        size="small"
+                        color="#D4AF37"
+                    />
+
+                    <Text style={styles.rateLoadingText}>
+                        Loading live rate...
+                    </Text>
+                </View>
+            ) : (
+                <>
+                    <View style={styles.rateMain}>
+                        <Text style={styles.rateLabel}>
+                            {metal === 'gold'
+                                ? `${selectedKarat}K GOLD RATE`
+                                : 'STANDARD SILVER RATE'}
+                        </Text>
+
+                        <Text style={styles.rateValue}>
+                            {selectedRate
+                                ? formatMoney(ratePerTola)
+                                : 'Rate unavailable'}
+                        </Text>
+
+                        <Text style={styles.rateUnit}>
+                            {metal === 'gold'
+                                ? `${selectedKarat}K Gold / Tola`
+                                : '999 Silver / Tola'}
+                        </Text>
+                    </View>
+
+                    <View style={styles.rateStatus}>
+                        <View
+                            style={[
+                                styles.statusDot,
+                                !selectedRate &&
+                                    styles.statusDotError,
+                            ]}
+                        />
+
+                        <Text
+                            style={[
+                                styles.statusText,
+                                !selectedRate &&
+                                    styles.statusTextError,
+                            ]}
+                        >
+                            {selectedRate ? 'LIVE RATE' : 'NO RATE'}
+                        </Text>
+                    </View>
+                </>
+            )}
+        </View>
+    );
+
+    const renderRateInfo = () => (
+        <View style={styles.infoBox}>
+            <Text style={styles.infoLabel}>
+                {metal === 'gold'
+                    ? `RATE FOR ${selectedKarat}K`
+                    : 'RATE FOR 999 SILVER'}
+            </Text>
+
+            <Text style={styles.infoValue}>
+                {formatMoney(ratePerTola)} / Tola
+            </Text>
+
+            <Text style={styles.infoSubValue}>
+                {formatRate(ratePerGram)} / Gram
             </Text>
         </View>
     );
@@ -252,27 +458,50 @@ const CalculatorScreen = ({ navigation }: any) => {
     const renderMenu = () => {
         const calculatorModes = [
             {
-                title: 'Gold → Money',
-                description: 'Gold weight ko current rate ke mutabiq money mein calculate karein.',
+                title:
+                    metal === 'gold'
+                        ? 'Gold → Money'
+                        : 'Silver → Money',
+                description:
+                    metal === 'gold'
+                        ? 'Gold weight ko current live rate ke mutabiq money mein calculate karein.'
+                        : 'Silver weight ko current live rate ke mutabiq money mein calculate karein.',
                 icon: 'G',
                 target: 'goldToMoney' as CalculatorMode,
             },
             {
-                title: 'Money → Gold',
+                title:
+                    metal === 'gold'
+                        ? 'Money → Gold'
+                        : 'Money → Silver',
                 description:
-                    'Available money se kitna gold purchase ho sakta hai calculate karein.',
+                    metal === 'gold'
+                        ? 'Available money se kitna gold purchase ho sakta hai calculate karein.'
+                        : 'Available money se kitna silver purchase ho sakta hai calculate karein.',
                 icon: 'M',
                 target: 'moneyToGold' as CalculatorMode,
             },
             {
-                title: 'Jewellery Price',
-                description: 'Gold + making charges + wastage ke sath final jewellery price.',
+                title:
+                    metal === 'gold'
+                        ? 'Jewellery Price'
+                        : 'Jewellery Price (Silver)',
+                description:
+                    metal === 'gold'
+                        ? 'Gold + making charges + wastage ke sath final jewellery price.'
+                        : 'Silver + making charges + wastage ke sath final jewellery price.',
                 icon: 'J',
                 target: 'jewelleryPrice' as CalculatorMode,
             },
             {
-                title: 'Gold Purchase',
-                description: 'Customer purchase ka complete gold calculation prepare karein.',
+                title:
+                    metal === 'gold'
+                        ? 'Gold Purchase'
+                        : 'Silver Purchase',
+                description:
+                    metal === 'gold'
+                        ? 'Customer purchase ka complete gold calculation prepare karein.'
+                        : 'Customer purchase ka complete silver calculation prepare karein.',
                 icon: 'P',
                 target: 'goldPurchase' as CalculatorMode,
             },
@@ -282,51 +511,50 @@ const CalculatorScreen = ({ navigation }: any) => {
             <>
                 <View style={styles.introSection}>
                     <View style={styles.calculatorIcon}>
-                        <Text style={styles.calculatorIconText}>🧮</Text>
+                        <Text style={styles.calculatorIconText}>
+                            🧮
+                        </Text>
                     </View>
 
                     <View style={styles.introTextContainer}>
-                        <Text style={styles.introTitle}>Jeweller Calculator</Text>
+                        <Text style={styles.introTitle}>
+                            Jeweller Calculator
+                        </Text>
 
                         <Text style={styles.introDescription}>
-                            Fast and accurate calculations for everyday jewellery business
-                            operations.
+                            Fast and accurate calculations for everyday
+                            jewellery business operations.
                         </Text>
                     </View>
                 </View>
 
-                <View style={styles.rateCard}>
-                    <View>
-                        <Text style={styles.rateLabel}>
-                            {metal === 'gold' ? 'STANDARD GOLD RATE' : 'STANDARD SILVER RATE'}
+                {renderLiveRateCard()}
+
+                {ratesError ? (
+                    <View style={styles.errorCard}>
+                        <Text style={styles.errorText}>
+                            {ratesError}
                         </Text>
 
-                        <Text style={styles.rateValue}>
-                            {metal === 'gold'
-                                ? rate24
-                                    ? formatMoney(numericRate24)
-                                    : 'Rs. XXXXX'
-                                : silverRate
-                                ? formatMoney(numericSilverRate)
-                                : 'Rs. XXXXX'}
-                        </Text>
-
-                        <Text style={styles.rateUnit}>
-                            {metal === 'gold' ? '24K Gold / Tola' : 'Silver / Tola'}
-                        </Text>
+                        <TouchableOpacity
+                            onPress={fetchMetalRates}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.retryText}>
+                                TAP TO RETRY
+                            </Text>
+                        </TouchableOpacity>
                     </View>
-
-                    <View style={styles.rateStatus}>
-                        <View style={styles.statusDot} />
-
-                        <Text style={styles.statusText}>Manual Rate</Text>
-                    </View>
-                </View>
+                ) : null}
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Calculate</Text>
+                    <Text style={styles.sectionTitle}>
+                        Calculate
+                    </Text>
 
-                    <Text style={styles.sectionSubtitle}>Select a calculation type</Text>
+                    <Text style={styles.sectionSubtitle}>
+                        Select a calculation type
+                    </Text>
                 </View>
 
                 {calculatorModes.map(item => (
@@ -337,13 +565,19 @@ const CalculatorScreen = ({ navigation }: any) => {
                         onPress={() => openMode(item.target)}
                     >
                         <View style={styles.modeIcon}>
-                            <Text style={styles.modeIconText}>{item.icon}</Text>
+                            <Text style={styles.modeIconText}>
+                                {item.icon}
+                            </Text>
                         </View>
 
                         <View style={styles.modeInfo}>
-                            <Text style={styles.modeTitle}>{item.title}</Text>
+                            <Text style={styles.modeTitle}>
+                                {item.title}
+                            </Text>
 
-                            <Text style={styles.modeDescription}>{item.description}</Text>
+                            <Text style={styles.modeDescription}>
+                                {item.description}
+                            </Text>
                         </View>
 
                         <Text style={styles.arrow}>›</Text>
@@ -351,7 +585,9 @@ const CalculatorScreen = ({ navigation }: any) => {
                 ))}
 
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Calculations</Text>
+                    <Text style={styles.sectionTitle}>
+                        Recent Calculations
+                    </Text>
 
                     <Text style={styles.sectionSubtitle}>
                         Your latest calculations will appear here.
@@ -361,10 +597,13 @@ const CalculatorScreen = ({ navigation }: any) => {
                 <View style={styles.emptyCard}>
                     <Text style={styles.emptyIcon}>∑</Text>
 
-                    <Text style={styles.emptyTitle}>No calculations yet</Text>
+                    <Text style={styles.emptyTitle}>
+                        No calculations yet
+                    </Text>
 
                     <Text style={styles.emptyText}>
-                        Start a calculation above and your recent calculations will appear here.
+                        Start a calculation above and your recent
+                        calculations will appear here.
                     </Text>
                 </View>
             </>
@@ -374,42 +613,68 @@ const CalculatorScreen = ({ navigation }: any) => {
     const renderGoldToMoney = () => (
         <>
             <View style={styles.toolIntro}>
-                <Text style={styles.toolTitle}>Gold → Money</Text>
+                <Text style={styles.toolTitle}>
+                    {metal === 'gold'
+                        ? 'Gold → Money'
+                        : 'Silver → Money'}
+                </Text>
+
                 <Text style={styles.toolDescription}>
-                    Gold weight ki market value calculate karein.
+                    {metal === 'gold'
+                        ? 'Gold weight ki live market value calculate karein.'
+                        : 'Silver weight ki live market value calculate karein.'}
                 </Text>
             </View>
 
+            {renderKaratSelector()}
+
             {renderInput(
-                metal === 'gold' ? '24K GOLD RATE / TOLA' : 'SILVER RATE / TOLA',
-                metal === 'gold' ? rate24 : silverRate,
-                metal === 'gold' ? setRate24 : setSilverRate,
-                metal === 'gold' ? 'e.g. 500000' : 'e.g. 6000',
-                'Rs.',
+                metal === 'gold'
+                    ? 'GOLD WEIGHT'
+                    : 'SILVER WEIGHT',
+                weight,
+                setWeight,
+                metal === 'gold' ? 'e.g. 2.5' : 'e.g. 10',
+                'Tola',
             )}
 
-            {metal === 'gold' && renderKaratSelector()}
-
-            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 2.5', 'Tola')}
-
-            <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>RATE FOR {selectedKarat}K</Text>
-
-                <Text style={styles.infoValue}>{formatMoney(ratePerTola)} / Tola</Text>
-
-                <Text style={styles.infoSubValue}>{formatRate(ratePerGram)} / Gram</Text>
-            </View>
+            {renderRateInfo()}
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>CALCULATION RESULT</Text>
+                <Text style={styles.resultTitle}>
+                    CALCULATION RESULT
+                </Text>
 
-                {renderResultRow('Gold Weight', `${formatNumber(numericWeight)} Tola`)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Weight'
+                        : 'Silver Weight',
+                    `${formatNumber(numericWeight)} Tola`,
+                )}
 
-                {renderResultRow('Gold Weight', `${formatNumber(numericWeight * TOLA_GRAMS)} Gram`)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Weight'
+                        : 'Silver Weight',
+                    `${formatNumber(
+                        numericWeight * TOLA_GRAMS,
+                    )} Gram`,
+                )}
 
-                {renderResultRow('Purity', `${selectedKarat}K`)}
+                {metal === 'gold'
+                    ? renderResultRow(
+                          'Purity',
+                          `${selectedKarat}K`,
+                      )
+                    : renderResultRow('Purity', '999')}
 
-                {renderResultRow('Gold Value', formatMoney(metalValue), true)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Value'
+                        : 'Silver Value',
+                    formatMoney(metalValue),
+                    true,
+                )}
             </View>
         </>
     );
@@ -417,36 +682,69 @@ const CalculatorScreen = ({ navigation }: any) => {
     const renderMoneyToGold = () => (
         <>
             <View style={styles.toolIntro}>
-                <Text style={styles.toolTitle}>Money → Gold</Text>
+                <Text style={styles.toolTitle}>
+                    {metal === 'gold'
+                        ? 'Money → Gold'
+                        : 'Money → Silver'}
+                </Text>
+
                 <Text style={styles.toolDescription}>
-                    Available budget ke against gold quantity calculate karein.
+                    {metal === 'gold'
+                        ? 'Available budget ke against gold quantity calculate karein.'
+                        : 'Available budget ke against silver quantity calculate karein.'}
                 </Text>
             </View>
 
-            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
+            {renderKaratSelector()}
 
-            {metal === 'gold' && renderKaratSelector()}
+            {renderInput(
+                'AVAILABLE MONEY',
+                money,
+                setMoney,
+                'e.g. 250000',
+                'Rs.',
+            )}
 
-            {renderInput('AVAILABLE MONEY', money, setMoney, 'e.g. 250000', 'Rs.')}
-
-            <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>RATE FOR {selectedKarat}K</Text>
-
-                <Text style={styles.infoValue}>{formatMoney(ratePerTola)} / Tola</Text>
-
-                <Text style={styles.infoSubValue}>{formatRate(ratePerGram)} / Gram</Text>
-            </View>
+            {renderRateInfo()}
 
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>GOLD YOU CAN BUY</Text>
+                <Text style={styles.resultTitle}>
+                    {metal === 'gold'
+                        ? 'GOLD YOU CAN BUY'
+                        : 'SILVER YOU CAN BUY'}
+                </Text>
 
-                {renderResultRow('Available Money', formatMoney(numericMoney))}
+                {renderResultRow(
+                    'Available Money',
+                    formatMoney(numericMoney),
+                )}
 
-                {renderResultRow('Gold Weight', `${formatNumber(moneyTometalGrams)} Gram`, true)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Weight'
+                        : 'Silver Weight',
+                    `${formatNumber(
+                        moneyTometalGrams,
+                    )} Gram`,
+                    true,
+                )}
 
-                {renderResultRow('Gold Weight', `${formatNumber(moneyTometalTola)} Tola`, true)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Weight'
+                        : 'Silver Weight',
+                    `${formatNumber(
+                        moneyTometalTola,
+                    )} Tola`,
+                    true,
+                )}
 
-                {renderResultRow('Purity', `${selectedKarat}K`)}
+                {metal === 'gold'
+                    ? renderResultRow(
+                          'Purity',
+                          `${selectedKarat}K`,
+                      )
+                    : renderResultRow('Purity', '999')}
             </View>
         </>
     );
@@ -454,22 +752,46 @@ const CalculatorScreen = ({ navigation }: any) => {
     const renderJewelleryPrice = () => (
         <>
             <View style={styles.toolIntro}>
-                <Text style={styles.toolTitle}>Jewellery Price</Text>
+                <Text style={styles.toolTitle}>
+                    {metal === 'gold'
+                        ? 'Jewellery Price'
+                        : 'Jewellery Price (Silver)'}
+                </Text>
+
                 <Text style={styles.toolDescription}>
-                    Gold, making, wastage aur additional charges ke sath final price calculate
-                    karein.
+                    {metal === 'gold'
+                        ? 'Gold, making, wastage aur additional charges ke sath final price calculate karein.'
+                        : 'Silver, making, wastage aur additional charges ke sath final price calculate karein.'}
                 </Text>
             </View>
 
-            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
+            {renderKaratSelector()}
 
-            {metal === 'gold' && renderKaratSelector()}
+            {renderInput(
+                metal === 'gold'
+                    ? 'GOLD WEIGHT'
+                    : 'SILVER WEIGHT',
+                weight,
+                setWeight,
+                metal === 'gold' ? 'e.g. 1.5' : 'e.g. 10',
+                'Tola',
+            )}
 
-            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 1.5', 'Tola')}
+            {renderInput(
+                'MAKING CHARGES',
+                makingPercent,
+                setMakingPercent,
+                'e.g. 8',
+                '%',
+            )}
 
-            {renderInput('MAKING CHARGES', makingPercent, setMakingPercent, 'e.g. 8', '%')}
-
-            {renderInput('WASTAGE / KASS', wastagePercent, setWastagePercent, 'e.g. 5', '%')}
+            {renderInput(
+                'WASTAGE / KASS',
+                wastagePercent,
+                setWastagePercent,
+                'e.g. 5',
+                '%',
+            )}
 
             {renderInput(
                 'STONES / OTHER CHARGES',
@@ -479,22 +801,49 @@ const CalculatorScreen = ({ navigation }: any) => {
                 'Rs.',
             )}
 
+            {renderRateInfo()}
+
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>JEWELLERY QUOTATION</Text>
+                <Text style={styles.resultTitle}>
+                    JEWELLERY QUOTATION
+                </Text>
 
-                {renderResultRow('Gold Value', formatMoney(metalValue))}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Value'
+                        : 'Silver Value',
+                    formatMoney(metalValue),
+                )}
 
-                {renderResultRow('Making Charges', formatMoney(makingValue))}
+                {renderResultRow(
+                    'Making Charges',
+                    formatMoney(makingValue),
+                )}
 
-                {renderResultRow('Wastage Weight', `${formatNumber(wastageWeight)} Gram`)}
+                {renderResultRow(
+                    'Wastage Weight',
+                    `${formatNumber(
+                        wastageWeight,
+                    )} Gram`,
+                )}
 
-                {renderResultRow('Wastage Value', formatMoney(wastageValue))}
+                {renderResultRow(
+                    'Wastage Value',
+                    formatMoney(wastageValue),
+                )}
 
-                {renderResultRow('Other Charges', formatMoney(numericExtra))}
+                {renderResultRow(
+                    'Other Charges',
+                    formatMoney(numericExtra),
+                )}
 
                 <View style={styles.resultDivider} />
 
-                {renderResultRow('FINAL PRICE', formatMoney(jewelleryTotal), true)}
+                {renderResultRow(
+                    'FINAL PRICE',
+                    formatMoney(jewelleryTotal),
+                    true,
+                )}
             </View>
         </>
     );
@@ -502,18 +851,30 @@ const CalculatorScreen = ({ navigation }: any) => {
     const renderGoldPurchase = () => (
         <>
             <View style={styles.toolIntro}>
-                <Text style={styles.toolTitle}>Gold Purchase</Text>
+                <Text style={styles.toolTitle}>
+                    {metal === 'gold'
+                        ? 'Gold Purchase'
+                        : 'Silver Purchase'}
+                </Text>
+
                 <Text style={styles.toolDescription}>
-                    Customer se gold purchase karte waqt deduction ke baad payable amount calculate
-                    karein.
+                    {metal === 'gold'
+                        ? 'Customer se gold purchase karte waqt deduction ke baad payable amount calculate karein.'
+                        : 'Customer se silver purchase karte waqt deduction ke baad payable amount calculate karein.'}
                 </Text>
             </View>
 
-            {renderInput('24K GOLD RATE / TOLA', rate24, setRate24, 'e.g. 500000', 'Rs.')}
+            {renderKaratSelector()}
 
-            {metal === 'gold' && renderKaratSelector()}
-
-            {renderInput('GOLD WEIGHT', weight, setWeight, 'e.g. 2', 'Tola')}
+            {renderInput(
+                metal === 'gold'
+                    ? 'GOLD WEIGHT'
+                    : 'SILVER WEIGHT',
+                weight,
+                setWeight,
+                metal === 'gold' ? 'e.g. 2' : 'e.g. 10',
+                'Tola',
+            )}
 
             {renderInput(
                 'PURCHASE DEDUCTION',
@@ -523,20 +884,46 @@ const CalculatorScreen = ({ navigation }: any) => {
                 '%',
             )}
 
+            {renderRateInfo()}
+
             <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>PURCHASE RESULT</Text>
+                <Text style={styles.resultTitle}>
+                    PURCHASE RESULT
+                </Text>
 
-                {renderResultRow('Gold Weight', `${formatNumber(numericWeight)} Tola`)}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gold Weight'
+                        : 'Silver Weight',
+                    `${formatNumber(
+                        numericWeight,
+                    )} Tola`,
+                )}
 
-                {renderResultRow('Gross Gold Value', formatMoney(metalValue))}
+                {renderResultRow(
+                    metal === 'gold'
+                        ? 'Gross Gold Value'
+                        : 'Gross Silver Value',
+                    formatMoney(metalValue),
+                )}
 
-                {renderResultRow('Deduction', `${numericDeduction}%`)}
+                {renderResultRow(
+                    'Deduction',
+                    `${numericDeduction}%`,
+                )}
 
-                {renderResultRow('Deduction Amount', formatMoney(purchaseDeduction))}
+                {renderResultRow(
+                    'Deduction Amount',
+                    formatMoney(purchaseDeduction),
+                )}
 
                 <View style={styles.resultDivider} />
 
-                {renderResultRow('PAYABLE AMOUNT', formatMoney(purchaseTotal), true)}
+                {renderResultRow(
+                    'PAYABLE AMOUNT',
+                    formatMoney(purchaseTotal),
+                    true,
+                )}
             </View>
         </>
     );
@@ -552,12 +939,17 @@ const CalculatorScreen = ({ navigation }: any) => {
             >
                 {mode === 'menu' && renderMenu()}
 
-                {mode === 'goldToMoney' && renderGoldToMoney()}
+                {mode === 'goldToMoney' &&
+                    renderGoldToMoney()}
 
-                {mode === 'moneyToGold' && renderMoneyToGold()}
-                {mode === 'jewelleryPrice' && renderJewelleryPrice()}
+                {mode === 'moneyToGold' &&
+                    renderMoneyToGold()}
 
-                {mode === 'goldPurchase' && renderGoldPurchase()}
+                {mode === 'jewelleryPrice' &&
+                    renderJewelleryPrice()}
+
+                {mode === 'goldPurchase' &&
+                    renderGoldPurchase()}
 
                 {mode !== 'menu' && (
                     <TouchableOpacity
@@ -565,7 +957,9 @@ const CalculatorScreen = ({ navigation }: any) => {
                         onPress={resetFields}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.resetButtonText}>CLEAR CALCULATION</Text>
+                        <Text style={styles.resetButtonText}>
+                            CLEAR CALCULATION
+                        </Text>
                     </TouchableOpacity>
                 )}
             </ScrollView>
@@ -690,6 +1084,23 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 17,
         marginBottom: 28,
+        minHeight: 92,
+    },
+
+    rateMain: {
+        flex: 1,
+    },
+
+    rateLoadingContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
+    rateLoadingText: {
+        color: '#888888',
+        fontSize: 12,
+        marginLeft: 10,
     },
 
     rateLabel: {
@@ -719,6 +1130,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 7,
         borderRadius: 20,
+        marginLeft: 10,
     },
 
     statusDot: {
@@ -729,10 +1141,42 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
 
+    statusDotError: {
+        backgroundColor: '#777777',
+    },
+
     statusText: {
         color: '#D4AF37',
         fontSize: 10,
         fontWeight: '700',
+    },
+
+    statusTextError: {
+        color: '#888888',
+    },
+
+    errorCard: {
+        backgroundColor: '#181818',
+        borderWidth: 1,
+        borderColor: '#4A2929',
+        borderRadius: 13,
+        padding: 13,
+        marginTop: -16,
+        marginBottom: 20,
+    },
+
+    errorText: {
+        color: '#AA7777',
+        fontSize: 11,
+        lineHeight: 17,
+    },
+
+    retryText: {
+        color: '#D4AF37',
+        fontSize: 10,
+        fontWeight: '800',
+        marginTop: 8,
+        letterSpacing: 0.8,
     },
 
     sectionHeader: {

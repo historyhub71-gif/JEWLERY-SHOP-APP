@@ -13,6 +13,11 @@ import {
     View,
 } from 'react-native';
 import {
+    calculateGoldPurityRates,
+    calculateShopRate,
+    validateBuySellRates,
+} from '../utils/shopRateEngine';
+import {
     ArrowDown,
     ArrowRight,
     ArrowUp,
@@ -86,12 +91,36 @@ const RATE_MODES: {
 ];
 
 const formatRate = (value: number | null | undefined) => {
-    if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    if (
+        value === null ||
+        value === undefined ||
+        !Number.isFinite(Number(value))
+    ) {
         return '—';
     }
 
     return Number(value).toLocaleString('en-PK', {
         maximumFractionDigits: 2,
+    });
+};
+
+const formatDateTime = (value: string | undefined) => {
+    if (!value) {
+        return 'Saved draft';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return 'Saved draft';
+    }
+
+    return date.toLocaleString('en-PK', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
     });
 };
 
@@ -152,88 +181,138 @@ const ShopRatesScreen = ({ navigation }: any) => {
     const [showPreview, setShowPreview] = useState(false);
 
     const selectedMode = useMemo(
-        () => RATE_MODES.find((item) => item.value === mode) ?? RATE_MODES[0],
+        () =>
+            RATE_MODES.find(item => item.value === mode) ?? RATE_MODES[0],
         [mode],
     );
 
     const effectiveSellRate = useMemo(() => {
-        const live = Number(liveRate);
-
-        if (!Number.isFinite(live)) {
+        if (liveRate === null || !Number.isFinite(liveRate)) {
             return null;
         }
 
-        if (mode === 'follow_live') {
-            return live;
+        try {
+            return calculateShopRate(liveRate, {
+                metal,
+                mode,
+                offset:
+                    mode === 'offset'
+                        ? Number(offsetAmount)
+                        : undefined,
+                fixedRate:
+                    mode === 'fixed'
+                        ? Number(fixedRate)
+                        : undefined,
+                enabled: true,
+            });
+        } catch {
+            return null;
         }
+    }, [liveRate, metal, mode, offsetAmount, fixedRate]);
 
-        if (mode === 'offset') {
-            const offset = Number(offsetAmount);
-
-            if (!Number.isFinite(offset)) {
-                return null;
-            }
-
-            return live + offset;
-        }
-
-        const fixed = Number(fixedRate);
-
-        if (!Number.isFinite(fixed)) {
+    const normalizedNumber = (
+        value: string | number | null | undefined,
+    ): number | null => {
+        if (value === null || value === undefined || value === '') {
             return null;
         }
 
-        return fixed;
-    }, [liveRate, mode, offsetAmount, fixedRate]);
+        const number = Number(value);
+
+        return Number.isFinite(number) ? number : null;
+    };
+
+    const isDraftCurrent = useMemo(() => {
+        if (!draft) {
+            return false;
+        }
+
+        const currentOffset =
+            mode === 'offset'
+                ? normalizedNumber(offsetAmount)
+                : null;
+
+        const currentFixed =
+            mode === 'fixed'
+                ? normalizedNumber(fixedRate)
+                : null;
+
+        const currentBuyRate = normalizedNumber(buyRate);
+
+        const draftOffset =
+            draft.mode === 'offset'
+                ? normalizedNumber(draft.offset_amount)
+                : null;
+
+        const draftFixed =
+            draft.mode === 'fixed'
+                ? normalizedNumber(draft.fixed_rate)
+                : null;
+
+        const draftBuyRate = normalizedNumber(draft.buy_rate);
+
+        return (
+            draft.metal === metal &&
+            draft.unit === unit &&
+            draft.mode === mode &&
+            draftOffset === currentOffset &&
+            draftFixed === currentFixed &&
+            draftBuyRate === currentBuyRate &&
+            draft.enabled === true
+        );
+    }, [
+        draft,
+        metal,
+        unit,
+        mode,
+        offsetAmount,
+        fixedRate,
+        buyRate,
+    ]);
 
     const derivedPurities = useMemo(() => {
         if (metal !== 'gold' || effectiveSellRate === null) {
             return null;
         }
 
-        return {
-            '24K': effectiveSellRate,
-            '22K': (effectiveSellRate * 22) / 24,
-            '21K': (effectiveSellRate * 21) / 24,
-            '18K': (effectiveSellRate * 18) / 24,
-        };
+        try {
+            return calculateGoldPurityRates(effectiveSellRate);
+        } catch {
+            return null;
+        }
     }, [metal, effectiveSellRate]);
 
     const buySellError = useMemo(() => {
-        const buy = Number(buyRate);
-        const sell = effectiveSellRate;
-
-        if (!buyRate || sell === null) {
+        if (!buyRate || effectiveSellRate === null) {
             return null;
         }
 
-        if (!Number.isFinite(buy)) {
-            return 'Enter a valid buy rate.';
-        }
+        const validation = validateBuySellRates(
+            Number(buyRate),
+            effectiveSellRate,
+        );
 
-        if (buy < 0) {
-            return 'Buy rate cannot be negative.';
-        }
-
-        if (sell < 0) {
-            return 'Sell rate cannot be negative.';
-        }
-
-        if (buy > sell) {
-            return 'Buy rate cannot be higher than sell rate.';
-        }
-
-        return null;
+        return validation.valid
+            ? null
+            : validation.error || 'Invalid buy/sell rates.';
     }, [buyRate, effectiveSellRate]);
 
     const selectedQuote = useMemo(
-        () => marketQuotes.find((quote) => quote.metal === metal),
+        () =>
+            marketQuotes.find(
+                quote => quote.metal === metal,
+            ),
         [marketQuotes, metal],
     );
 
     const loadLiveRate = useCallback(
-        async (selectedMetal: Metal, selectedUnit: RateUnit) => {
-            const purity = selectedMetal === 'gold' ? 24 : 999;
+        async (
+            selectedMetal: Metal,
+            selectedUnit: RateUnit,
+        ) => {
+            const purity =
+                selectedMetal === 'gold' ? 24 : 999;
+
             const column =
                 selectedUnit === 'gram'
                     ? 'rate_per_gram'
@@ -277,13 +356,10 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
             try {
                 const [
-                    liveRateValue,
                     marketResponse,
                     publishedResponse,
                     draftResponse,
                 ] = await Promise.all([
-                    loadLiveRate(metal, unit),
-
                     supabase.functions.invoke('shop-rates', {
                         body: {
                             action: 'get_live_market',
@@ -352,7 +428,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                     );
                 }
 
-                const quotes = Array.isArray(marketResponse.data?.quotes)
+                const quotes = Array.isArray(
+                    marketResponse.data?.quotes,
+                )
                     ? marketResponse.data.quotes
                     : [];
 
@@ -362,65 +440,60 @@ const ShopRatesScreen = ({ navigation }: any) => {
                     ? publishedResponse.data.rates.find(
                           (rate: PublishedRate) =>
                               rate.metal === metal,
-                      )
+                      ) ?? null
                     : null;
 
-                const loadedDraft = draftResponse.data?.draft ?? null;
+                const loadedDraft =
+                    draftResponse.data?.draft ?? null;
+
+                const sourceConfig =
+                    loadedDraft ?? published;
+
+                const resolvedUnit: RateUnit =
+                    sourceConfig?.unit ?? unit;
+
+                const resolvedMode: RateMode =
+                    sourceConfig?.mode ?? 'follow_live';
+
+                const resolvedOffset =
+                    sourceConfig?.offset_amount !== null &&
+                    sourceConfig?.offset_amount !== undefined
+                        ? String(sourceConfig.offset_amount)
+                        : '';
+
+                const resolvedFixed =
+                    sourceConfig?.fixed_rate !== null &&
+                    sourceConfig?.fixed_rate !== undefined
+                        ? String(sourceConfig.fixed_rate)
+                        : '';
+
+                const resolvedBuy =
+                    sourceConfig?.buy_rate !== null &&
+                    sourceConfig?.buy_rate !== undefined
+                        ? String(sourceConfig.buy_rate)
+                        : '';
+
+                const liveRateValue = await loadLiveRate(
+                    metal,
+                    resolvedUnit,
+                );
 
                 setLiveRate(liveRateValue);
                 setMarketQuotes(quotes);
-                setPublishedRate(published ?? null);
+                setPublishedRate(published);
                 setDraft(loadedDraft);
 
-                if (loadedDraft) {
-                    setUnit(loadedDraft.unit);
-                    setMode(loadedDraft.mode);
-                    setOffsetAmount(
-                        loadedDraft.offset_amount !== null &&
-                            loadedDraft.offset_amount !== undefined
-                            ? String(loadedDraft.offset_amount)
-                            : '',
-                    );
-                    setFixedRate(
-                        loadedDraft.fixed_rate !== null &&
-                            loadedDraft.fixed_rate !== undefined
-                            ? String(loadedDraft.fixed_rate)
-                            : '',
-                    );
-                    setBuyRate(
-                        loadedDraft.buy_rate !== null &&
-                            loadedDraft.buy_rate !== undefined
-                            ? String(loadedDraft.buy_rate)
-                            : '',
-                    );
-                } else if (published) {
-                    setUnit(published.unit);
-                    setMode(published.mode);
-                    setOffsetAmount(
-                        published.offset_amount !== null &&
-                            published.offset_amount !== undefined
-                            ? String(published.offset_amount)
-                            : '',
-                    );
-                    setFixedRate(
-                        published.fixed_rate !== null &&
-                            published.fixed_rate !== undefined
-                            ? String(published.fixed_rate)
-                            : '',
-                    );
-                    setBuyRate(
-                        published.buy_rate !== null &&
-                            published.buy_rate !== undefined
-                            ? String(published.buy_rate)
-                            : '',
-                    );
-                } else {
-                    setBuyRate('');
-                    setOffsetAmount('');
-                    setFixedRate('');
-                }
+                setUnit(resolvedUnit);
+                setMode(resolvedMode);
+
+                setOffsetAmount(resolvedOffset);
+                setFixedRate(resolvedFixed);
+                setBuyRate(resolvedBuy);
             } catch (error) {
-                console.error('SHOP RATES SCREEN LOAD FAILED:', error);
+                console.error(
+                    'SHOP RATES SCREEN LOAD FAILED:',
+                    error,
+                );
 
                 Alert.alert(
                     'Unable to Load Shop Rates',
@@ -455,7 +528,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
         setPublishedRate(null);
     };
 
-    const handleUnitChange = async (nextUnit: RateUnit) => {
+    const handleUnitChange = async (
+        nextUnit: RateUnit,
+    ) => {
         if (nextUnit === unit) {
             return;
         }
@@ -463,7 +538,10 @@ const ShopRatesScreen = ({ navigation }: any) => {
         try {
             setRefreshing(true);
 
-            const nextLiveRate = await loadLiveRate(metal, nextUnit);
+            const nextLiveRate = await loadLiveRate(
+                metal,
+                nextUnit,
+            );
 
             setUnit(nextUnit);
             setLiveRate(nextLiveRate);
@@ -504,11 +582,17 @@ const ShopRatesScreen = ({ navigation }: any) => {
         }
 
         if (buySellError) {
-            Alert.alert('Invalid Rates', buySellError);
+            Alert.alert(
+                'Invalid Rates',
+                buySellError,
+            );
             return;
         }
 
-        if (mode === 'offset' && !Number.isFinite(Number(offsetAmount))) {
+        if (
+            mode === 'offset' &&
+            !Number.isFinite(Number(offsetAmount))
+        ) {
             Alert.alert(
                 'Offset Required',
                 'Please enter a valid offset amount.',
@@ -516,7 +600,10 @@ const ShopRatesScreen = ({ navigation }: any) => {
             return;
         }
 
-        if (mode === 'fixed' && !Number.isFinite(Number(fixedRate))) {
+        if (
+            mode === 'fixed' &&
+            !Number.isFinite(Number(fixedRate))
+        ) {
             Alert.alert(
                 'Fixed Rate Required',
                 'Please enter a valid fixed rate.',
@@ -527,27 +614,28 @@ const ShopRatesScreen = ({ navigation }: any) => {
         setSaving(true);
 
         try {
-            const { data, error } = await supabase.functions.invoke(
-                'shop-rates',
-                {
-                    body: {
-                        action: 'save_draft',
-                        metal,
-                        unit,
-                        mode,
-                        offset_amount:
-                            mode === 'offset'
-                                ? Number(offsetAmount)
-                                : null,
-                        fixed_rate:
-                            mode === 'fixed'
-                                ? Number(fixedRate)
-                                : null,
-                        buy_rate: buy,
-                        enabled: true,
+            const { data, error } =
+                await supabase.functions.invoke(
+                    'shop-rates',
+                    {
+                        body: {
+                            action: 'save_draft',
+                            metal,
+                            unit,
+                            mode,
+                            offset_amount:
+                                mode === 'offset'
+                                    ? Number(offsetAmount)
+                                    : null,
+                            fixed_rate:
+                                mode === 'fixed'
+                                    ? Number(fixedRate)
+                                    : null,
+                            buy_rate: buy,
+                            enabled: true,
+                        },
                     },
-                },
-            );
+                );
 
             if (error) {
                 throw new Error(
@@ -560,7 +648,8 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
             if (!data?.success || !data?.draft) {
                 throw new Error(
-                    data?.error || 'Draft save failed.',
+                    data?.error ||
+                        'Draft save failed.',
                 );
             }
 
@@ -568,10 +657,17 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
             Alert.alert(
                 'Draft Saved',
-                `${metal === 'gold' ? 'Gold' : 'Silver'} shop rate draft saved successfully.`,
+                `${
+                    metal === 'gold'
+                        ? 'Gold'
+                        : 'Silver'
+                } shop rate draft saved successfully.`,
             );
         } catch (error) {
-            console.error('SHOP RATE DRAFT SAVE FAILED:', error);
+            console.error(
+                'SHOP RATE DRAFT SAVE FAILED:',
+                error,
+            );
 
             Alert.alert(
                 'Save Failed',
@@ -585,24 +681,95 @@ const ShopRatesScreen = ({ navigation }: any) => {
     };
 
     const openPreview = () => {
-        if (effectiveSellRate === null) {
+        if (!draft) {
             Alert.alert(
-                'Preview Unavailable',
-                'Configure a valid sell rate first.',
+                'Draft Required',
+                'Please save your current shop rate configuration as a draft before previewing.',
             );
             return;
         }
 
-        if (!buyRate || buySellError) {
+        if (!isDraftCurrent) {
+            Alert.alert(
+                'Save Draft First',
+                'Your current configuration has changed since the last draft was saved. Please save the draft again before previewing.',
+            );
+            return;
+        }
+
+        if (
+            !Number.isFinite(
+                Number(draft.sell_rate),
+            )
+        ) {
             Alert.alert(
                 'Preview Unavailable',
-                buySellError || 'Enter a valid buy rate first.',
+                'The saved draft does not contain a valid sell rate.',
+            );
+            return;
+        }
+
+        if (
+            !Number.isFinite(
+                Number(draft.buy_rate),
+            )
+        ) {
+            Alert.alert(
+                'Preview Unavailable',
+                'The saved draft does not contain a valid buy rate.',
             );
             return;
         }
 
         setShowPreview(true);
     };
+
+    const handleContinueToPublish = () => {
+        setShowPreview(false);
+
+        Alert.alert(
+            'Ready to Publish',
+            'This saved draft is ready for the secure publishing step. The shop-rate PIN confirmation will be added next.',
+        );
+    };
+
+    const previewMode = useMemo(() => {
+        if (!draft) {
+            return RATE_MODES[0];
+        }
+
+        return (
+            RATE_MODES.find(
+                item => item.value === draft.mode,
+            ) ?? RATE_MODES[0]
+        );
+    }, [draft]);
+
+    const previewPurities = useMemo(() => {
+        if (!draft || draft.metal !== 'gold') {
+            return null;
+        }
+
+        return {
+            '24K': draft.gold_24k,
+            '22K': draft.gold_22k,
+            '21K': draft.gold_21k,
+            '18K': draft.gold_18k,
+        };
+    }, [draft]);
+
+    const previewSellRate = draft?.sell_rate ?? null;
+    const previewBuyRate = draft?.buy_rate ?? null;
+
+    const previewOffset =
+        draft?.mode === 'offset'
+            ? draft.offset_amount
+            : null;
+
+    const previewFixedRate =
+        draft?.mode === 'fixed'
+            ? draft.fixed_rate
+            : null;
 
     const getRateTrend = () => {
         if (!selectedQuote?.current_usd || !liveRate) {
@@ -627,7 +794,8 @@ const ShopRatesScreen = ({ navigation }: any) => {
                 </Text>
 
                 <Text style={styles.loadingText}>
-                    Preparing your live market and shop-rate workspace...
+                    Preparing your live market and
+                    shop-rate workspace...
                 </Text>
             </View>
         );
@@ -644,11 +812,19 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
             <KeyboardAvoidingView
                 style={styles.flex}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={
+                    Platform.OS === 'ios'
+                        ? 'padding'
+                        : undefined
+                }
             >
                 <ScrollView
-                    contentContainerStyle={styles.content}
-                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={
+                        styles.content
+                    }
+                    showsVerticalScrollIndicator={
+                        false
+                    }
                 >
                     {/* HERO */}
                     <View style={styles.hero}>
@@ -658,7 +834,11 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                 size={14}
                             />
 
-                            <Text style={styles.heroBadgeText}>
+                            <Text
+                                style={
+                                    styles.heroBadgeText
+                                }
+                            >
                                 ADMIN RATE DESK
                             </Text>
                         </View>
@@ -667,9 +847,12 @@ const ShopRatesScreen = ({ navigation }: any) => {
                             Set your shop's rate.
                         </Text>
 
-                        <Text style={styles.heroSubtitle}>
-                            Market data stays live. Your published shop
-                            rate is what your customers see.
+                        <Text
+                            style={styles.heroSubtitle}
+                        >
+                            Market data stays live. Your
+                            published shop rate is what
+                            your customers see.
                         </Text>
                     </View>
 
@@ -682,7 +865,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     styles.segmentActive,
                             ]}
                             onPress={() =>
-                                handleMetalChange('gold')
+                                handleMetalChange(
+                                    'gold',
+                                )
                             }
                             activeOpacity={0.85}
                         >
@@ -713,11 +898,17 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     styles.segmentActive,
                             ]}
                             onPress={() =>
-                                handleMetalChange('silver')
+                                handleMetalChange(
+                                    'silver',
+                                )
                             }
                             activeOpacity={0.85}
                         >
-                            <View style={styles.silverDot} />
+                            <View
+                                style={
+                                    styles.silverDot
+                                }
+                            />
 
                             <Text
                                 style={[
@@ -734,53 +925,106 @@ const ShopRatesScreen = ({ navigation }: any) => {
                     {/* MARKET + PUBLISHED */}
                     <View style={styles.rateGrid}>
                         <View style={styles.rateCard}>
-                            <View style={styles.cardTopRow}>
+                            <View
+                                style={
+                                    styles.cardTopRow
+                                }
+                            >
                                 <View>
-                                    <Text style={styles.cardEyebrow}>
+                                    <Text
+                                        style={
+                                            styles.cardEyebrow
+                                        }
+                                    >
                                         MARKET RATE
                                     </Text>
 
-                                    <Text style={styles.cardLabel}>
-                                        Live {metal === 'gold' ? '24K' : '999'}
+                                    <Text
+                                        style={
+                                            styles.cardLabel
+                                        }
+                                    >
+                                        Live{' '}
+                                        {metal === 'gold'
+                                            ? '24K'
+                                            : '999'}
                                     </Text>
                                 </View>
 
-                                <View style={styles.liveBadge}>
-                                    <View style={styles.liveDot} />
-                                    <Text style={styles.liveText}>
+                                <View
+                                    style={
+                                        styles.liveBadge
+                                    }
+                                >
+                                    <View
+                                        style={
+                                            styles.liveDot
+                                        }
+                                    />
+
+                                    <Text
+                                        style={
+                                            styles.liveText
+                                        }
+                                    >
                                         LIVE
                                     </Text>
                                 </View>
                             </View>
 
-                            <Text style={styles.bigRate}>
+                            <Text
+                                style={styles.bigRate}
+                            >
                                 {formatRate(liveRate)}
                             </Text>
 
-                            <Text style={styles.rateUnit}>
+                            <Text
+                                style={styles.rateUnit}
+                            >
                                 PKR / {unit}
                             </Text>
 
-                            <View style={styles.marketFooter}>
+                            <View
+                                style={
+                                    styles.marketFooter
+                                }
+                            >
                                 <TrendingUp
                                     color="#63D471"
                                     size={15}
                                 />
 
-                                <Text style={styles.marketFooterText}>
-                                    Source: live market feed
+                                <Text
+                                    style={
+                                        styles.marketFooterText
+                                    }
+                                >
+                                    Source: live market
+                                    feed
                                 </Text>
                             </View>
                         </View>
 
                         <View style={styles.rateCard}>
-                            <View style={styles.cardTopRow}>
+                            <View
+                                style={
+                                    styles.cardTopRow
+                                }
+                            >
                                 <View>
-                                    <Text style={styles.cardEyebrow}>
+                                    <Text
+                                        style={
+                                            styles.cardEyebrow
+                                        }
+                                    >
                                         PUBLISHED SHOP RATE
                                     </Text>
 
-                                    <Text style={styles.cardLabel}>
+                                    <Text
+                                        style={
+                                            styles.cardLabel
+                                        }
+                                    >
                                         Customer-facing
                                     </Text>
                                 </View>
@@ -795,7 +1039,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                 />
                             </View>
 
-                            <Text style={styles.bigRate}>
+                            <Text
+                                style={styles.bigRate}
+                            >
                                 {publishedRate
                                     ? formatRate(
                                           publishedRate.sell_rate,
@@ -803,11 +1049,17 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     : '—'}
                             </Text>
 
-                            <Text style={styles.rateUnit}>
-                                PKR / {unit}
+                            <Text
+                                style={styles.rateUnit}
+                            >PKR / {publishedRate?.unit ?? unit}
+                                
                             </Text>
 
-                            <Text style={styles.publishedMode}>
+                            <Text
+                                style={
+                                    styles.publishedMode
+                                }
+                            >
                                 {publishedRate
                                     ? publishedRate.mode.replace(
                                           '_',
@@ -820,8 +1072,12 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
                     {/* REFRESH */}
                     <TouchableOpacity
-                        style={styles.refreshButton}
-                        onPress={() => loadScreenData(true)}
+                        style={
+                            styles.refreshButton
+                        }
+                        onPress={() =>
+                            loadScreenData(true)
+                        }
                         disabled={refreshing}
                         activeOpacity={0.8}
                     >
@@ -837,7 +1093,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                             />
                         )}
 
-                        <Text style={styles.refreshText}>
+                        <Text
+                            style={styles.refreshText}
+                        >
                             {refreshing
                                 ? 'Refreshing...'
                                 : 'Refresh market data'}
@@ -851,11 +1109,15 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
                     {/* UNIT */}
                     <View style={styles.sectionCard}>
-                        <Text style={styles.inputLabel}>
+                        <Text
+                            style={styles.inputLabel}
+                        >
                             RATE UNIT
                         </Text>
 
-                        <View style={styles.unitRow}>
+                        <View
+                            style={styles.unitRow}
+                        >
                             <TouchableOpacity
                                 style={[
                                     styles.unitButton,
@@ -863,7 +1125,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                         styles.unitButtonActive,
                                 ]}
                                 onPress={() =>
-                                    handleUnitChange('tola')
+                                    handleUnitChange(
+                                        'tola',
+                                    )
                                 }
                                 activeOpacity={0.85}
                             >
@@ -885,7 +1149,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                         styles.unitButtonActive,
                                 ]}
                                 onPress={() =>
-                                    handleUnitChange('gram')
+                                    handleUnitChange(
+                                        'gram',
+                                    )
                                 }
                                 activeOpacity={0.85}
                             >
@@ -904,31 +1170,55 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
                     {/* MODE */}
                     <View style={styles.sectionCard}>
-                        <Text style={styles.inputLabel}>
+                        <Text
+                            style={styles.inputLabel}
+                        >
                             SELL RATE MODE
                         </Text>
 
                         <TouchableOpacity
-                            style={styles.modeSelector}
+                            style={
+                                styles.modeSelector
+                            }
                             onPress={() =>
-                                setShowModeMenu((value) => !value)
+                                setShowModeMenu(
+                                    value => !value,
+                                )
                             }
                             activeOpacity={0.85}
                         >
-                            <View style={styles.modeSelectorIcon}>
+                            <View
+                                style={
+                                    styles.modeSelectorIcon
+                                }
+                            >
                                 <TrendingUp
                                     color={colors.gold}
                                     size={19}
                                 />
                             </View>
 
-                            <View style={styles.modeSelectorCopy}>
-                                <Text style={styles.modeSelectorTitle}>
+                            <View
+                                style={
+                                    styles.modeSelectorCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.modeSelectorTitle
+                                    }
+                                >
                                     {selectedMode.title}
                                 </Text>
 
-                                <Text style={styles.modeSelectorSubtitle}>
-                                    {selectedMode.subtitle}
+                                <Text
+                                    style={
+                                        styles.modeSelectorSubtitle
+                                    }
+                                >
+                                    {
+                                        selectedMode.subtitle
+                                    }
                                 </Text>
                             </View>
 
@@ -939,78 +1229,122 @@ const ShopRatesScreen = ({ navigation }: any) => {
                         </TouchableOpacity>
 
                         {showModeMenu && (
-                            <View style={styles.modeMenu}>
-                                {RATE_MODES.map((item) => (
-                                    <TouchableOpacity
-                                        key={item.value}
-                                        style={[
-                                            styles.modeOption,
-                                            mode === item.value &&
-                                                styles.modeOptionActive,
-                                        ]}
-                                        onPress={() => {
-                                            setMode(item.value);
-                                            setShowModeMenu(false);
-                                        }}
-                                        activeOpacity={0.85}
-                                    >
-                                        <View
-                                            style={
-                                                styles.modeOptionCopy
+                            <View
+                                style={
+                                    styles.modeMenu
+                                }
+                            >
+                                {RATE_MODES.map(
+                                    item => (
+                                        <TouchableOpacity
+                                            key={
+                                                item.value
+                                            }
+                                            style={[
+                                                styles.modeOption,
+                                                mode ===
+                                                    item.value &&
+                                                    styles.modeOptionActive,
+                                            ]}
+                                            onPress={() => {
+                                                setMode(
+                                                    item.value,
+                                                );
+                                                setShowModeMenu(
+                                                    false,
+                                                );
+                                            }}
+                                            activeOpacity={
+                                                0.85
                                             }
                                         >
-                                            <Text
-                                                style={[
-                                                    styles.modeOptionTitle,
-                                                    mode ===
-                                                        item.value &&
-                                                        styles.modeOptionTitleActive,
-                                                ]}
-                                            >
-                                                {item.title}
-                                            </Text>
-
-                                            <Text
+                                            <View
                                                 style={
-                                                    styles.modeOptionSubtitle
+                                                    styles.modeOptionCopy
                                                 }
                                             >
-                                                {item.subtitle}
-                                            </Text>
-                                        </View>
+                                                <Text
+                                                    style={[
+                                                        styles.modeOptionTitle,
+                                                        mode ===
+                                                            item.value &&
+                                                            styles.modeOptionTitleActive,
+                                                    ]}
+                                                >
+                                                    {
+                                                        item.title
+                                                    }
+                                                </Text>
 
-                                        {mode === item.value && (
-                                            <CheckCircle2
-                                                color={colors.gold}
-                                                size={19}
-                                            />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
+                                                <Text
+                                                    style={
+                                                        styles.modeOptionSubtitle
+                                                    }
+                                                >
+                                                    {
+                                                        item.subtitle
+                                                    }
+                                                </Text>
+                                            </View>
+
+                                            {mode ===
+                                                item.value && (
+                                                <CheckCircle2
+                                                    color={
+                                                        colors.gold
+                                                    }
+                                                    size={
+                                                        19
+                                                    }
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+                                    ),
+                                )}
                             </View>
                         )}
                     </View>
 
                     {/* OFFSET / FIXED */}
                     {mode === 'offset' && (
-                        <View style={styles.sectionCard}>
-                            <Text style={styles.inputLabel}>
+                        <View
+                            style={styles.sectionCard}
+                        >
+                            <Text
+                                style={
+                                    styles.inputLabel
+                                }
+                            >
                                 OFFSET AMOUNT
                             </Text>
 
-                            <Text style={styles.helperText}>
-                                Positive adds to the live rate.
-                                Negative reduces it.
+                            <Text
+                                style={
+                                    styles.helperText
+                                }
+                            >
+                                Positive adds to the live
+                                rate. Negative reduces it.
                             </Text>
 
-                            <View style={styles.inputShell}>
-                                <Text style={styles.inputPrefix}>
+                            <View
+                                style={
+                                    styles.inputShell
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.inputPrefix
+                                    }
+                                >
                                     PKR
                                 </Text>
 
                                 <TextInput
-                                    value={offsetAmount}
-                                    onChangeText={(value) =>
+                                    value={
+                                        offsetAmount
+                                    }
+                                    onChangeText={value =>
                                         setOffsetAmount(
                                             value.replace(
                                                 /[^0-9.-]/g,
@@ -1023,31 +1357,52 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     placeholderTextColor={
                                         colors.textSubtle
                                     }
-                                    style={styles.rateInput}
+                                    style={
+                                        styles.rateInput
+                                    }
                                 />
                             </View>
                         </View>
                     )}
 
                     {mode === 'fixed' && (
-                        <View style={styles.sectionCard}>
-                            <Text style={styles.inputLabel}>
+                        <View
+                            style={styles.sectionCard}
+                        >
+                            <Text
+                                style={
+                                    styles.inputLabel
+                                }
+                            >
                                 FIXED SELL RATE
                             </Text>
 
-                            <Text style={styles.helperText}>
-                                This rate stays fixed until you publish
-                                another configuration.
+                            <Text
+                                style={
+                                    styles.helperText
+                                }
+                            >
+                                This rate stays fixed until
+                                you publish another
+                                configuration.
                             </Text>
 
-                            <View style={styles.inputShell}>
-                                <Text style={styles.inputPrefix}>
+                            <View
+                                style={
+                                    styles.inputShell
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.inputPrefix
+                                    }
+                                >
                                     PKR
                                 </Text>
 
                                 <TextInput
                                     value={fixedRate}
-                                    onChangeText={(value) =>
+                                    onChangeText={value =>
                                         setFixedRate(
                                             value.replace(
                                                 /[^0-9.]/g,
@@ -1060,53 +1415,93 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     placeholderTextColor={
                                         colors.textSubtle
                                     }
-                                    style={styles.rateInput}
+                                    style={
+                                        styles.rateInput
+                                    }
                                 />
                             </View>
                         </View>
                     )}
 
                     {/* SELL PREVIEW */}
-                    <View style={styles.sellPreview}>
+                    <View
+                        style={
+                            styles.sellPreview
+                        }
+                    >
                         <View>
-                            <Text style={styles.sellPreviewEyebrow}>
+                            <Text
+                                style={
+                                    styles.sellPreviewEyebrow
+                                }
+                            >
                                 EFFECTIVE SELL RATE
                             </Text>
 
-                            <Text style={styles.sellPreviewRate}>
-                                {formatRate(effectiveSellRate)}
+                            <Text
+                                style={
+                                    styles.sellPreviewRate
+                                }
+                            >
+                                {formatRate(
+                                    effectiveSellRate,
+                                )}
                             </Text>
 
-                            <Text style={styles.sellPreviewUnit}>
+                            <Text
+                                style={
+                                    styles.sellPreviewUnit
+                                }
+                            >
                                 PKR / {unit}
                             </Text>
                         </View>
 
-                        {effectiveSellRate !== null &&
+                        {effectiveSellRate !==
+                            null &&
                             liveRate !== null &&
-                            effectiveSellRate > liveRate && (
-                                <View style={styles.upBadge}>
+                            effectiveSellRate >
+                                liveRate && (
+                                <View
+                                    style={
+                                        styles.upBadge
+                                    }
+                                >
                                     <ArrowUp
                                         color="#63D471"
                                         size={15}
                                     />
 
-                                    <Text style={styles.upBadgeText}>
+                                    <Text
+                                        style={
+                                            styles.upBadgeText
+                                        }
+                                    >
                                         Above live
                                     </Text>
                                 </View>
                             )}
 
-                        {effectiveSellRate !== null &&
+                        {effectiveSellRate !==
+                            null &&
                             liveRate !== null &&
-                            effectiveSellRate < liveRate && (
-                                <View style={styles.downBadge}>
+                            effectiveSellRate <
+                                liveRate && (
+                                <View
+                                    style={
+                                        styles.downBadge
+                                    }
+                                >
                                     <ArrowDown
                                         color="#FF9A9A"
                                         size={15}
                                     />
 
-                                    <Text style={styles.downBadgeText}>
+                                    <Text
+                                        style={
+                                            styles.downBadgeText
+                                        }
+                                    >
                                         Below live
                                     </Text>
                                 </View>
@@ -1115,24 +1510,43 @@ const ShopRatesScreen = ({ navigation }: any) => {
 
                     {/* BUY RATE */}
                     <View style={styles.sectionCard}>
-                        <View style={styles.buyHeader}>
+                        <View
+                            style={styles.buyHeader}
+                        >
                             <View>
-                                <Text style={styles.inputLabel}>
+                                <Text
+                                    style={
+                                        styles.inputLabel
+                                    }
+                                >
                                     BUY RATE
                                 </Text>
 
-                                <Text style={styles.helperText}>
-                                    Must not exceed your sell rate.
+                                <Text
+                                    style={
+                                        styles.helperText
+                                    }
+                                >
+                                    Must not exceed your
+                                    sell rate.
                                 </Text>
                             </View>
 
-                            <View style={styles.buyBadge}>
+                            <View
+                                style={
+                                    styles.buyBadge
+                                }
+                            >
                                 <ShieldCheck
                                     color={colors.gold}
                                     size={14}
                                 />
 
-                                <Text style={styles.buyBadgeText}>
+                                <Text
+                                    style={
+                                        styles.buyBadgeText
+                                    }
+                                >
                                     Margin protected
                                 </Text>
                             </View>
@@ -1145,13 +1559,17 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                     styles.inputShellError,
                             ]}
                         >
-                            <Text style={styles.inputPrefix}>
+                            <Text
+                                style={
+                                    styles.inputPrefix
+                                }
+                            >
                                 PKR
                             </Text>
 
                             <TextInput
                                 value={buyRate}
-                                onChangeText={(value) =>
+                                onChangeText={value =>
                                     setBuyRate(
                                         value.replace(
                                             /[^0-9.]/g,
@@ -1164,165 +1582,270 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                 placeholderTextColor={
                                     colors.textSubtle
                                 }
-                                style={styles.rateInput}
+                                style={
+                                    styles.rateInput
+                                }
                             />
                         </View>
 
                         {buySellError ? (
-                            <Text style={styles.errorText}>
+                            <Text
+                                style={
+                                    styles.errorText
+                                }
+                            >
                                 {buySellError}
                             </Text>
                         ) : (
-                            <Text style={styles.validText}>
+                            <Text
+                                style={
+                                    styles.validText
+                                }
+                            >
                                 Buy rate is valid.
                             </Text>
                         )}
                     </View>
 
                     {/* GOLD PURITY */}
-                    {metal === 'gold' && derivedPurities && (
-                        <>
-                            <SectionHeader
-                                title="Gold purity preview"
-                                subtitle="24K controls all derived gold purities"
-                            />
+                    {metal === 'gold' &&
+                        derivedPurities && (
+                            <>
+                                <SectionHeader
+                                    title="Gold purity preview"
+                                    subtitle="24K controls all derived gold purities"
+                                />
 
-                            <View style={styles.purityCard}>
-                                {(
-                                    Object.keys(
-                                        derivedPurities,
-                                    ) as Array<keyof typeof derivedPurities>
-                                ).map((purity) => (
-                                    <View
-                                        key={purity}
-                                        style={styles.purityRow}
-                                    >
-                                        <View
-                                            style={
-                                                styles.purityLeft
-                                            }
+                                <View
+                                    style={
+                                        styles.purityCard
+                                    }
+                                >
+                                    {(
+                                        Object.keys(
+                                            derivedPurities,
+                                        ) as Array<
+                                            keyof typeof derivedPurities
                                         >
+                                    ).map(
+                                        purity => (
                                             <View
-                                                style={
-                                                    styles.purityDot
+                                                key={
+                                                    purity
                                                 }
-                                            />
-
-                                            <Text
                                                 style={
-                                                    styles.purityName
+                                                    styles.purityRow
                                                 }
                                             >
-                                                {purity}
-                                            </Text>
-                                        </View>
+                                                <View
+                                                    style={
+                                                        styles.purityLeft
+                                                    }
+                                                >
+                                                    <View
+                                                        style={
+                                                            styles.purityDot
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={
+                                                            styles.purityName
+                                                        }
+                                                    >
+                                                        {
+                                                            purity
+                                                        }
+                                                    </Text>
+                                                </View>
+
+                                                <Text
+                                                    style={
+                                                        styles.purityRate
+                                                    }
+                                                >
+                                                    {formatRate(
+                                                        derivedPurities[
+                                                            purity
+                                                        ],
+                                                    )}
+                                                </Text>
+                                            </View>
+                                        ),
+                                    )}
+
+                                    <View
+                                        style={
+                                            styles.purityNote
+                                        }
+                                    >
+                                        <Gem
+                                            color={
+                                                colors.gold
+                                            }
+                                            size={14}
+                                        />
 
                                         <Text
                                             style={
-                                                styles.purityRate
+                                                styles.purityNoteText
                                             }
                                         >
-                                            {formatRate(
-                                                derivedPurities[
-                                                    purity
-                                                ],
-                                            )}
+                                            Derived automatically
+                                            from the effective
+                                            24K sell rate.
                                         </Text>
                                     </View>
-                                ))}
-
-                                <View style={styles.purityNote}>
-                                    <Gem
-                                        color={colors.gold}
-                                        size={14}
-                                    />
-
-                                    <Text
-                                        style={styles.purityNoteText}
-                                    >
-                                        Derived automatically from the
-                                        effective 24K sell rate.
-                                    </Text>
                                 </View>
-                            </View>
-                        </>
-                    )}
+                            </>
+                        )}
 
                     {metal === 'silver' && (
-                        <View style={styles.silverPreview}>
-                            <View style={styles.silverPreviewIcon}>
-                                <View style={styles.silverLargeDot} />
+                        <View
+                            style={
+                                styles.silverPreview
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.silverPreviewIcon
+                                }
+                            >
+                                <View
+                                    style={
+                                        styles.silverLargeDot
+                                    }
+                                />
                             </View>
 
-                            <View style={styles.silverPreviewCopy}>
-                                <Text style={styles.silverPreviewTitle}>
+                            <View
+                                style={
+                                    styles.silverPreviewCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.silverPreviewTitle
+                                    }
+                                >
                                     Silver 999
                                 </Text>
 
-                                <Text style={styles.silverPreviewText}>
-                                    Your effective sell rate applies to
-                                    Silver 999.
+                                <Text
+                                    style={
+                                        styles.silverPreviewText
+                                    }
+                                >
+                                    Your effective sell rate
+                                    applies to Silver 999.
                                 </Text>
                             </View>
                         </View>
                     )}
 
                     {/* DRAFT STATUS */}
-                    <View style={styles.draftStatus}>
-                        <View style={styles.draftStatusIcon}>
+                    <View
+                        style={
+                            styles.draftStatus
+                        }
+                    >
+                        <View
+                            style={
+                                styles.draftStatusIcon
+                            }
+                        >
                             <Save
                                 color={colors.gold}
                                 size={17}
                             />
                         </View>
 
-                        <View style={styles.draftStatusCopy}>
-                            <Text style={styles.draftStatusTitle}>
-                                {draft
+                        <View
+                            style={
+                                styles.draftStatusCopy
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.draftStatusTitle
+                                }
+                            >
+                                {!draft
+                                    ? 'No saved draft yet'
+                                    : isDraftCurrent
                                     ? 'Draft ready'
-                                    : 'No saved draft yet'}
+                                    : 'Unsaved changes'}
                             </Text>
 
-                            <Text style={styles.draftStatusText}>
-                                {draft
-                                    ? 'Your current configuration has been saved securely.'
-                                    : 'Save your configuration before publishing.'}
+                            <Text
+                                style={
+                                    styles.draftStatusText
+                                }
+                            >
+                                {!draft
+                                    ? 'Save your configuration before previewing or publishing.'
+                                    : isDraftCurrent
+                                    ? 'Your current configuration matches the saved draft.'
+                                    : 'Your current configuration has changed. Save the draft again before previewing.'}
                             </Text>
                         </View>
 
-                        {draft && (
-                            <CheckCircle2
-                                color="#63D471"
-                                size={19}
-                            />
-                        )}
+                        {draft &&
+                            isDraftCurrent && (
+                                <CheckCircle2
+                                    color="#63D471"
+                                    size={19}
+                                />
+                            )}
+
+                        {draft &&
+                            !isDraftCurrent && (
+                                <RefreshCw
+                                    color={colors.gold}
+                                    size={19}
+                                />
+                            )}
                     </View>
 
                     {/* ACTIONS */}
-                    <View style={styles.actionStack}>
+                    <View
+                        style={
+                            styles.actionStack
+                        }
+                    >
                         <TouchableOpacity
                             style={[
                                 styles.primaryButton,
                                 saving &&
                                     styles.primaryButtonDisabled,
                             ]}
-                            onPress={handleSaveDraft}
+                            onPress={
+                                handleSaveDraft
+                            }
                             disabled={saving}
                             activeOpacity={0.85}
                         >
                             {saving ? (
                                 <ActivityIndicator
-                                    color={colors.background}
+                                    color={
+                                        colors.background
+                                    }
                                     size="small"
                                 />
                             ) : (
                                 <Save
-                                    color={colors.background}
+                                    color={
+                                        colors.background
+                                    }
                                     size={18}
                                 />
                             )}
 
-                            <Text style={styles.primaryButtonText}>
+                            <Text
+                                style={
+                                    styles.primaryButtonText
+                                }
+                            >
                                 {saving
                                     ? 'Saving Draft...'
                                     : 'Save Draft'}
@@ -1330,7 +1853,9 @@ const ShopRatesScreen = ({ navigation }: any) => {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.secondaryButton}
+                            style={
+                                styles.secondaryButton
+                            }
                             onPress={openPreview}
                             activeOpacity={0.85}
                         >
@@ -1339,72 +1864,149 @@ const ShopRatesScreen = ({ navigation }: any) => {
                                 size={18}
                             />
 
-                            <Text style={styles.secondaryButtonText}>
+                            <Text
+                                style={
+                                    styles.secondaryButtonText
+                                }
+                            >
                                 Preview Before Publish
                             </Text>
 
                             <ArrowRight
-                                color={colors.textSubtle}
+                                color={
+                                    colors.textSubtle
+                                }
                                 size={18}
                             />
                         </TouchableOpacity>
                     </View>
 
                     {/* SECURITY MESSAGE */}
-                    <View style={styles.securityBanner}>
+                    <View
+                        style={
+                            styles.securityBanner
+                        }
+                    >
                         <LockKeyhole
                             color={colors.gold}
                             size={18}
                         />
 
-                        <View style={styles.securityCopy}>
-                            <Text style={styles.securityTitle}>
+                        <View
+                            style={
+                                styles.securityCopy
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.securityTitle
+                                }
+                            >
                                 Protected publishing
                             </Text>
 
-                            <Text style={styles.securityText}>
-                                Publishing requires your secure shop-rate
-                                PIN. The PIN is never stored in the app.
+                            <Text
+                                style={
+                                    styles.securityText
+                                }
+                            >
+                                Publishing requires your
+                                secure shop-rate PIN. The
+                                PIN is never stored in the
+                                app.
                             </Text>
                         </View>
                     </View>
 
-                    <Text style={styles.footerText}>
-                        GoldKing Shop Rates • Admin workspace
+                    <Text
+                        style={styles.footerText}
+                    >
+                        GoldKing Shop Rates • Admin
+                        workspace
                     </Text>
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* PREVIEW MODAL */}
+            {/* ========================================================= */}
+            {/* STEP 3 — PRODUCTION PUBLISH PREVIEW                     */}
+            {/* ========================================================= */}
             <Modal
                 visible={showPreview}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setShowPreview(false)}
+                onRequestClose={() =>
+                    setShowPreview(false)
+                }
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.previewModal}>
-                        <View style={styles.previewHandle} />
+                <View
+                    style={
+                        styles.modalOverlay
+                    }
+                >
+                    <View
+                        style={
+                            styles.previewModal
+                        }
+                    >
+                        <View
+                            style={
+                                styles.previewHandle
+                            }
+                        />
 
-                        <View style={styles.previewHeader}>
-                            <View>
-                                <Text style={styles.previewEyebrow}>
-                                    PUBLISH PREVIEW
+                        {/* HEADER */}
+                        <View
+                            style={
+                                styles.previewHeader
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.previewHeaderCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewEyebrow
+                                    }
+                                >
+                                    PUBLISH REVIEW
                                 </Text>
 
-                                <Text style={styles.previewTitle}>
-                                    {metal === 'gold'
+                                <Text
+                                    style={
+                                        styles.previewTitle
+                                    }
+                                >
+                                    {draft?.metal ===
+                                    'gold'
                                         ? 'Gold'
                                         : 'Silver'}{' '}
                                     shop rate
                                 </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewSubtitle
+                                    }
+                                >
+                                    Review the saved draft
+                                    before publishing it to
+                                    customers.
+                                </Text>
                             </View>
 
                             <TouchableOpacity
-                                style={styles.closeButton}
-                                onPress={() =>
-                                    setShowPreview(false)
+                                style={
+                                    styles.closeButton
                                 }
+                                onPress={() =>
+                                    setShowPreview(
+                                        false,
+                                    )
+                                }
+                                hitSlop={8}
+                                activeOpacity={0.8}
                             >
                                 <Text
                                     style={
@@ -1416,112 +2018,655 @@ const ShopRatesScreen = ({ navigation }: any) => {
                             </TouchableOpacity>
                         </View>
 
-                        <View style={styles.previewRateBox}>
-                            <Text style={styles.previewRateLabel}>
-                                CUSTOMER SELL RATE
-                            </Text>
-
-                            <Text style={styles.previewRate}>
-                                {formatRate(effectiveSellRate)}
-                            </Text>
-
-                            <Text style={styles.previewRateUnit}>
-                                PKR / {unit}
-                            </Text>
-                        </View>
-
-                        <View style={styles.previewRow}>
-                            <Text style={styles.previewRowLabel}>
-                                Buy rate
-                            </Text>
-
-                            <Text style={styles.previewRowValue}>
-                                {formatRate(Number(buyRate))}
-                            </Text>
-                        </View>
-
-                        <View style={styles.previewRow}>
-                            <Text style={styles.previewRowLabel}>
-                                Mode
-                            </Text>
-
-                            <Text style={styles.previewRowValue}>
-                                {selectedMode.title}
-                            </Text>
-                        </View>
-
-                        {metal === 'gold' && derivedPurities && (
-                            <View style={styles.previewPurities}>
-                                <Text
-                                    style={
-                                        styles.previewPurityHeading
-                                    }
-                                >
-                                    GOLD PURITIES
-                                </Text>
-
-                                {(
-                                    Object.keys(
-                                        derivedPurities,
-                                    ) as Array<keyof typeof derivedPurities>
-                                ).map((purity) => (
-                                    <View
-                                        key={purity}
-                                        style={
-                                            styles.previewPurityRow
-                                        }
-                                    >
-                                        <Text
-                                            style={
-                                                styles.previewPurityName
-                                            }
-                                        >
-                                            {purity}
-                                        </Text>
-
-                                        <Text
-                                            style={
-                                                styles.previewPurityValue
-                                            }
-                                        >
-                                            {formatRate(
-                                                derivedPurities[
-                                                    purity
-                                                ],
-                                            )}
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-
-                        <View style={styles.previewWarning}>
-                            <ShieldCheck
-                                color={colors.gold}
-                                size={17}
+                        {/* SAVED DRAFT BADGE */}
+                        <View
+                            style={
+                                styles.previewStatusBadge
+                            }
+                        >
+                            <CheckCircle2
+                                color="#63D471"
+                                size={15}
                             />
 
                             <Text
-                                style={styles.previewWarningText}
+                                style={
+                                    styles.previewStatusText
+                                }
                             >
-                                Save the draft first. Publishing will
-                                require your shop-rate PIN.
+                                SAVED DRAFT • READY
                             </Text>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.previewCloseButton}
-                            onPress={() => setShowPreview(false)}
-                            activeOpacity={0.85}
+                        {/* CUSTOMER-FACING RATE */}
+                        <View
+                            style={
+                                styles.previewRateBox
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.previewRateBoxTop
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewRateLabel
+                                    }
+                                >
+                                    CUSTOMER SELL RATE
+                                </Text>
+
+                                <View
+                                    style={
+                                        styles.previewCustomerBadge
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.previewCustomerBadgeText
+                                        }
+                                    >
+                                        CUSTOMER VIEW
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Text
+                                style={
+                                    styles.previewRate
+                                }
+                            >
+                                {formatRate(
+                                    previewSellRate,
+                                )}
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.previewRateUnit
+                                }
+                            >
+                                PKR /{' '}
+                                {draft?.unit ??
+                                    unit}
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.previewRateDescription
+                                }
+                            >
+                                This is the sell rate
+                                stored in the saved draft.
+                            </Text>
+                        </View>
+
+                        {/* SUMMARY */}
+                        <View
+                            style={
+                                styles.previewSection
+                            }
                         >
                             <Text
                                 style={
-                                    styles.previewCloseButtonText
+                                    styles.previewSectionTitle
                                 }
                             >
-                                Back to Rate Desk
+                                RATE SUMMARY
                             </Text>
-                        </TouchableOpacity>
+
+                            <View
+                                style={
+                                    styles.previewRow
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewRowLabel
+                                    }
+                                >
+                                    Metal
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewRowValue
+                                    }
+                                >
+                                    {draft?.metal ===
+                                    'gold'
+                                        ? 'Gold'
+                                        : 'Silver'}
+                                </Text>
+                            </View>
+
+                            <View
+                                style={
+                                    styles.previewRow
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewRowLabel
+                                    }
+                                >
+                                    Rate unit
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewRowValue
+                                    }
+                                >
+                                    {draft?.unit ===
+                                    'gram'
+                                        ? 'Per Gram'
+                                        : 'Per Tola'}
+                                </Text>
+                            </View>
+
+                            <View
+                                style={
+                                    styles.previewRow
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewRowLabel
+                                    }
+                                >
+                                    Sell mode
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewRowValue
+                                    }
+                                >
+                                    {
+                                        previewMode.title
+                                    }
+                                </Text>
+                            </View>
+
+                            <View
+                                style={
+                                    styles.previewRow
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewRowLabel
+                                    }
+                                >
+                                    Buy rate
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewRowValueGold
+                                    }
+                                >
+                                    PKR{' '}
+                                    {formatRate(
+                                        previewBuyRate,
+                                    )}
+                                </Text>
+                            </View>
+
+                            {draft?.mode ===
+                                'offset' && (
+                                <View
+                                    style={
+                                        styles.previewRow
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.previewRowLabel
+                                        }
+                                    >
+                                        Offset
+                                    </Text>
+
+                                    <Text
+                                        style={
+                                            styles.previewRowValue
+                                        }
+                                    >
+                                        PKR{' '}
+                                        {formatRate(
+                                            previewOffset,
+                                        )}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {draft?.mode ===
+                                'fixed' && (
+                                <View
+                                    style={
+                                        styles.previewRow
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.previewRowLabel
+                                        }
+                                    >
+                                        Fixed rate
+                                    </Text>
+
+                                    <Text
+                                        style={
+                                            styles.previewRowValue
+                                        }
+                                    >
+                                        PKR{' '}
+                                        {formatRate(
+                                            previewFixedRate,
+                                        )}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* MARKET CONTEXT */}
+                        <View
+                            style={
+                                styles.previewMarketCard
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.previewMarketIcon
+                                }
+                            >
+                                <TrendingUp
+                                    color={
+                                        colors.gold
+                                    }
+                                    size={17}
+                                />
+                            </View>
+
+                            <View
+                                style={
+                                    styles.previewMarketCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewMarketTitle
+                                    }
+                                >
+                                    Current market context
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewMarketText
+                                    }
+                                >
+                                    Live{' '}
+                                    {draft?.metal ===
+                                    'gold'
+                                        ? '24K Gold'
+                                        : '999 Silver'}{' '}
+                                    is currently{' '}
+                                    <Text
+                                        style={
+                                            styles.previewMarketStrong
+                                        }
+                                    >
+                                        PKR{' '}
+                                        {formatRate(
+                                            liveRate,
+                                        )}
+                                    </Text>{' '}
+                                    per{' '}
+                                    {draft?.unit ??
+                                        unit}
+                                    .
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* DYNAMIC MODE NOTICE */}
+                        {draft?.mode ===
+                            'follow_live' && (
+                            <View
+                                style={
+                                    styles.previewInfoBanner
+                                }
+                            >
+                                <RefreshCw
+                                    color={
+                                        colors.gold
+                                    }
+                                    size={16}
+                                />
+
+                                <Text
+                                    style={
+                                        styles.previewInfoText
+                                    }
+                                >
+                                    Follow Live is linked
+                                    to market pricing.
+                                    The saved draft above
+                                    is the configuration
+                                    being reviewed; the
+                                    live market can move
+                                    independently.
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* GOLD PURITIES */}
+                        {draft?.metal ===
+                            'gold' &&
+                            previewPurities && (
+                                <View
+                                    style={
+                                        styles.previewPurities
+                                    }
+                                >
+                                    <View
+                                        style={
+                                            styles.previewPuritiesHeader
+                                        }
+                                    >
+                                        <View>
+                                            <Text
+                                                style={
+                                                    styles.previewPurityHeading
+                                                }
+                                            >
+                                                GOLD PURITIES
+                                            </Text>
+
+                                            <Text
+                                                style={
+                                                    styles.previewPuritySubheading
+                                                }
+                                            >
+                                                Saved customer
+                                                rates
+                                            </Text>
+                                        </View>
+
+                                        <Gem
+                                            color={
+                                                colors.gold
+                                            }
+                                            size={18}
+                                        />
+                                    </View>
+
+                                    {(
+                                        Object.keys(
+                                            previewPurities,
+                                        ) as Array<
+                                            keyof typeof previewPurities
+                                        >
+                                    ).map(
+                                        purity => (
+                                            <View
+                                                key={
+                                                    purity
+                                                }
+                                                style={
+                                                    styles.previewPurityRow
+                                                }
+                                            >
+                                                <View
+                                                    style={
+                                                        styles.previewPurityNameWrap
+                                                    }
+                                                >
+                                                    <View
+                                                        style={
+                                                            styles.previewPurityDot
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={
+                                                            styles.previewPurityName
+                                                        }
+                                                    >
+                                                        {
+                                                            purity
+                                                        }
+                                                    </Text>
+                                                </View>
+
+                                                <Text
+                                                    style={
+                                                        styles.previewPurityValue
+                                                    }
+                                                >
+                                                    PKR{' '}
+                                                    {formatRate(
+                                                        previewPurities[
+                                                            purity
+                                                        ],
+                                                    )}
+                                                </Text>
+                                            </View>
+                                        ),
+                                    )}
+                                </View>
+                            )}
+
+                        {/* SILVER PREVIEW */}
+                        {draft?.metal ===
+                            'silver' && (
+                            <View
+                                style={
+                                    styles.previewSilverCard
+                                }
+                            >
+                                <View
+                                    style={
+                                        styles.previewSilverIcon
+                                    }
+                                >
+                                    <View
+                                        style={
+                                            styles.previewSilverDot
+                                        }
+                                    />
+                                </View>
+
+                                <View
+                                    style={
+                                        styles.previewSilverCopy
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.previewSilverTitle
+                                        }
+                                    >
+                                        Silver 999
+                                    </Text>
+
+                                    <Text
+                                        style={
+                                            styles.previewSilverText
+                                        }
+                                    >
+                                        The saved shop rate
+                                        applies to 999
+                                        purity silver.
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+
+                        {/* DRAFT METADATA */}
+                        <View
+                            style={
+                                styles.previewDraftMeta
+                            }
+                        >
+                            <View
+                                style={
+                                    styles.previewDraftMetaIcon
+                                }
+                            >
+                                <Save
+                                    color={
+                                        colors.gold
+                                    }
+                                    size={15}
+                                />
+                            </View>
+
+                            <View
+                                style={
+                                    styles.previewDraftMetaCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewDraftMetaTitle
+                                    }
+                                >
+                                    Saved configuration
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewDraftMetaText
+                                    }
+                                >
+                                    {draft?.id
+                                        ? `Draft ID: ${draft.id}`
+                                        : 'Saved draft'}
+                                </Text>
+                            </View>
+
+                            <Text
+                                style={
+                                    styles.previewDraftMetaDate
+                                }
+                            >
+                                {formatDateTime(
+                                    (draft as Draft & {
+                                        created_at?: string;
+                                        updated_at?: string;
+                                    })?.updated_at ??
+                                        (
+                                            draft as Draft & {
+                                                created_at?: string;
+                                            }
+                                        )?.created_at,
+                                )}
+                            </Text>
+                        </View>
+
+                        {/* SECURITY */}
+                        <View
+                            style={
+                                styles.previewWarning
+                            }
+                        >
+                            <ShieldCheck
+                                color={
+                                    colors.gold
+                                }
+                                size={18}
+                            />
+
+                            <View
+                                style={
+                                    styles.previewWarningCopy
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.previewWarningTitle
+                                    }
+                                >
+                                    Secure publishing
+                                </Text>
+
+                                <Text
+                                    style={
+                                        styles.previewWarningText
+                                    }
+                                >
+                                    This preview is based on
+                                    the saved draft. Publishing
+                                    requires your shop-rate PIN
+                                    and is a separate protected
+                                    action.
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* ACTIONS */}
+                        <View
+                            style={
+                                styles.previewActions
+                            }
+                        >
+                            <TouchableOpacity
+                                style={
+                                    styles.previewBackButton
+                                }
+                                onPress={() =>
+                                    setShowPreview(
+                                        false,
+                                    )
+                                }
+                                activeOpacity={0.85}
+                            >
+                                <Text
+                                    style={
+                                        styles.previewBackButtonText
+                                    }
+                                >
+                                    Back to Rate Desk
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={
+                                    styles.previewPublishButton
+                                }
+                                onPress={
+                                    handleContinueToPublish
+                                }
+                                activeOpacity={0.85}
+                            >
+                                <ShieldCheck
+                                    color={
+                                        colors.background
+                                    }
+                                    size={17}
+                                />
+
+                                <Text
+                                    style={
+                                        styles.previewPublishButtonText
+                                    }
+                                >
+                                    Continue to Publish
+                                </Text>
+
+                                <ArrowRight
+                                    color={
+                                        colors.background
+                                    }
+                                    size={17}
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -2231,19 +3376,25 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
+    /* ========================================================= */
+    /* STEP 3 PREVIEW                                            */
+    /* ========================================================= */
+
     modalOverlay: {
-        backgroundColor: 'rgba(0,0,0,0.72)',
+        backgroundColor: 'rgba(0,0,0,0.78)',
         flex: 1,
         justifyContent: 'flex-end',
     },
 
     previewModal: {
-        backgroundColor: '#141414',
-        borderColor: colors.border,
-        borderTopLeftRadius: 26,
-        borderTopRightRadius: 26,
+        backgroundColor: '#121212',
+        borderColor: '#302A1A',
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
         borderWidth: 1,
-        padding: spacing.lg,
+        maxHeight: '94%',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
         paddingBottom: spacing.xl,
     },
 
@@ -2253,33 +3404,48 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         height: 4,
         marginBottom: spacing.lg,
-        width: 42,
+        width: 44,
     },
 
     previewHeader: {
-        alignItems: 'center',
+        alignItems: 'flex-start',
         flexDirection: 'row',
         justifyContent: 'space-between',
+    },
+
+    previewHeaderCopy: {
+        flex: 1,
+        paddingRight: spacing.md,
     },
 
     previewEyebrow: {
         color: colors.gold,
         fontSize: 8,
         fontWeight: '900',
-        letterSpacing: 1,
+        letterSpacing: 1.4,
     },
 
     previewTitle: {
         color: colors.text,
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '900',
+        letterSpacing: -0.4,
         marginTop: 4,
+    },
+
+    previewSubtitle: {
+        color: colors.textSubtle,
+        fontSize: 10,
+        lineHeight: 15,
+        marginTop: 5,
     },
 
     closeButton: {
         alignItems: 'center',
         backgroundColor: '#242424',
+        borderColor: '#333333',
         borderRadius: 18,
+        borderWidth: 1,
         height: 36,
         justifyContent: 'center',
         width: 36,
@@ -2292,33 +3458,97 @@ const styles = StyleSheet.create({
         lineHeight: 28,
     },
 
+    previewStatusBadge: {
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: '#15251A',
+        borderColor: '#24462C',
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: 'row',
+        marginTop: spacing.md,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+    },
+
+    previewStatusText: {
+        color: '#63D471',
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 0.8,
+        marginLeft: 5,
+    },
+
     previewRateBox: {
         backgroundColor: '#211D12',
-        borderColor: '#55471E',
+        borderColor: '#665522',
         borderRadius: radii.md,
         borderWidth: 1,
-        marginTop: spacing.lg,
+        marginTop: spacing.md,
         padding: spacing.lg,
+    },
+
+    previewRateBoxTop: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
     },
 
     previewRateLabel: {
         color: colors.gold,
         fontSize: 8,
         fontWeight: '900',
-        letterSpacing: 1,
+        letterSpacing: 1.2,
+    },
+
+    previewCustomerBadge: {
+        backgroundColor: '#181818',
+        borderColor: '#4B4020',
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
+    },
+
+    previewCustomerBadgeText: {
+        color: colors.textSubtle,
+        fontSize: 7,
+        fontWeight: '900',
+        letterSpacing: 0.6,
     },
 
     previewRate: {
         color: colors.text,
-        fontSize: 32,
+        fontSize: 34,
         fontWeight: '900',
-        marginTop: 6,
+        letterSpacing: -0.7,
+        marginTop: 8,
     },
 
     previewRateUnit: {
-        color: colors.textSubtle,
+        color: colors.gold,
         fontSize: 11,
-        marginTop: 3,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
+    previewRateDescription: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        lineHeight: 14,
+        marginTop: 8,
+    },
+
+    previewSection: {
+        marginTop: spacing.md,
+    },
+
+    previewSectionTitle: {
+        color: colors.textSubtle,
+        fontSize: 8,
+        fontWeight: '900',
+        letterSpacing: 1.1,
+        marginBottom: spacing.xs,
     },
 
     previewRow: {
@@ -2327,88 +3557,304 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        minHeight: 50,
+        minHeight: 43,
     },
 
     previewRowLabel: {
         color: colors.textMuted,
-        fontSize: 11,
+        fontSize: 10,
     },
 
     previewRowValue: {
         color: colors.text,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
-        textTransform: 'capitalize',
+    },
+
+    previewRowValueGold: {
+        color: colors.gold,
+        fontSize: 12,
+        fontWeight: '900',
+    },
+
+    previewMarketCard: {
+        alignItems: 'center',
+        backgroundColor: '#181818',
+        borderColor: colors.border,
+        borderRadius: radii.md,
+        borderWidth: 1,
+        flexDirection: 'row',
+        marginTop: spacing.md,
+        padding: spacing.md,
+    },
+
+    previewMarketIcon: {
+        alignItems: 'center',
+        backgroundColor: '#252015',
+        borderRadius: radii.sm,
+        height: 38,
+        justifyContent: 'center',
+        width: 38,
+    },
+
+    previewMarketCopy: {
+        flex: 1,
+        marginLeft: spacing.sm,
+    },
+
+    previewMarketTitle: {
+        color: colors.text,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+
+    previewMarketText: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        lineHeight: 14,
+        marginTop: 3,
+    },
+
+    previewMarketStrong: {
+        color: colors.gold,
+        fontWeight: '900',
+    },
+
+    previewInfoBanner: {
+        alignItems: 'flex-start',
+        backgroundColor: '#211D12',
+        borderColor: '#55471E',
+        borderRadius: radii.sm,
+        borderWidth: 1,
+        flexDirection: 'row',
+        marginTop: spacing.sm,
+        padding: spacing.sm,
+    },
+
+    previewInfoText: {
+        color: colors.textSubtle,
+        flex: 1,
+        fontSize: 9,
+        lineHeight: 14,
+        marginLeft: 7,
     },
 
     previewPurities: {
         backgroundColor: '#181818',
         borderColor: colors.border,
-        borderRadius: radii.sm,
+        borderRadius: radii.md,
         borderWidth: 1,
         marginTop: spacing.md,
         padding: spacing.md,
     },
 
+    previewPuritiesHeader: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: spacing.xs,
+    },
+
     previewPurityHeading: {
-        color: colors.textSubtle,
+        color: colors.gold,
         fontSize: 8,
         fontWeight: '900',
-        letterSpacing: 1,
-        marginBottom: spacing.xs,
+        letterSpacing: 1.1,
+    },
+
+    previewPuritySubheading: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        marginTop: 2,
     },
 
     previewPurityRow: {
         alignItems: 'center',
+        borderBottomColor: colors.border,
+        borderBottomWidth: 1,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        minHeight: 30,
+        minHeight: 36,
+    },
+
+    previewPurityNameWrap: {
+        alignItems: 'center',
+        flexDirection: 'row',
+    },
+
+    previewPurityDot: {
+        backgroundColor: colors.gold,
+        borderRadius: 4,
+        height: 8,
+        width: 8,
     },
 
     previewPurityName: {
         color: colors.textMuted,
-        fontSize: 11,
-        fontWeight: '700',
+        fontSize: 10,
+        fontWeight: '800',
+        marginLeft: 7,
     },
 
     previewPurityValue: {
         color: colors.gold,
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '900',
     },
 
-    previewWarning: {
+    previewSilverCard: {
         alignItems: 'center',
-        backgroundColor: '#211D12',
+        backgroundColor: '#181818',
+        borderColor: colors.border,
+        borderRadius: radii.md,
+        borderWidth: 1,
+        flexDirection: 'row',
+        marginTop: spacing.md,
+        padding: spacing.md,
+    },
+
+    previewSilverIcon: {
+        alignItems: 'center',
+        backgroundColor: '#242424',
         borderRadius: radii.sm,
+        height: 42,
+        justifyContent: 'center',
+        width: 42,
+    },
+
+    previewSilverDot: {
+        backgroundColor: '#C7CCD3',
+        borderRadius: 10,
+        height: 20,
+        width: 20,
+    },
+
+    previewSilverCopy: {
+        flex: 1,
+        marginLeft: spacing.sm,
+    },
+
+    previewSilverTitle: {
+        color: colors.text,
+        fontSize: 12,
+        fontWeight: '800',
+    },
+
+    previewSilverText: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        lineHeight: 14,
+        marginTop: 3,
+    },
+
+    previewDraftMeta: {
+        alignItems: 'center',
+        backgroundColor: '#181818',
+        borderColor: colors.border,
+        borderRadius: radii.md,
+        borderWidth: 1,
         flexDirection: 'row',
         marginTop: spacing.md,
         padding: spacing.sm,
     },
 
-    previewWarningText: {
-        color: colors.textSubtle,
-        flex: 1,
-        fontSize: 10,
-        lineHeight: 15,
-        marginLeft: 6,
+    previewDraftMetaIcon: {
+        alignItems: 'center',
+        backgroundColor: '#252015',
+        borderRadius: radii.sm,
+        height: 34,
+        justifyContent: 'center',
+        width: 34,
     },
 
-    previewCloseButton: {
+    previewDraftMetaCopy: {
+        flex: 1,
+        marginLeft: spacing.sm,
+    },
+
+    previewDraftMetaTitle: {
+        color: colors.text,
+        fontSize: 10,
+        fontWeight: '800',
+    },
+
+    previewDraftMetaText: {
+        color: colors.textSubtle,
+        fontSize: 8,
+        marginTop: 2,
+    },
+
+    previewDraftMetaDate: {
+        color: colors.textSubtle,
+        fontSize: 8,
+        maxWidth: 105,
+        textAlign: 'right',
+    },
+
+    previewWarning: {
+        alignItems: 'flex-start',
+        backgroundColor: '#211D12',
+        borderColor: '#55471E',
+        borderRadius: radii.md,
+        borderWidth: 1,
+        flexDirection: 'row',
+        marginTop: spacing.md,
+        padding: spacing.md,
+    },
+
+    previewWarningCopy: {
+        flex: 1,
+        marginLeft: spacing.sm,
+    },
+
+    previewWarningTitle: {
+        color: colors.gold,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+
+    previewWarningText: {
+        color: colors.textSubtle,
+        fontSize: 9,
+        lineHeight: 14,
+        marginTop: 3,
+    },
+
+    previewActions: {
+        gap: spacing.sm,
+        marginTop: spacing.md,
+    },
+
+    previewBackButton: {
         alignItems: 'center',
         borderColor: '#3A321F',
         borderRadius: radii.md,
         borderWidth: 1,
-        marginTop: spacing.md,
-        minHeight: 50,
         justifyContent: 'center',
+        minHeight: 48,
     },
 
-    previewCloseButtonText: {
+    previewBackButtonText: {
         color: colors.gold,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
+    },
+
+    previewPublishButton: {
+        alignItems: 'center',
+        backgroundColor: colors.gold,
+        borderRadius: radii.md,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        minHeight: 52,
+        paddingHorizontal: spacing.md,
+    },
+
+    previewPublishButtonText: {
+        color: colors.background,
+        fontSize: 12,
+        fontWeight: '900',
+        marginHorizontal: 7,
     },
 });
 

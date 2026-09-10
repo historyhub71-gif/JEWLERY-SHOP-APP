@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
     },
 
     metalLabelActive: {
-        color: '#D4AF37',
+        color: '#f0e02d',
     },
 
     content: {
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
         width: 7,
         height: 7,
         borderRadius: 4,
-        backgroundColor: '#D4AF37',
+        backgroundColor: '#95db33',
         marginRight: 6,
     },
 
@@ -1146,7 +1146,7 @@ const styles = StyleSheet.create({
     },
 
     statusText: {
-        color: '#D4AF37',
+        color: '#95db33',
         fontSize: 10,
         fontWeight: '700',
     },

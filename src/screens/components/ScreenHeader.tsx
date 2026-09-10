@@ -21,23 +21,39 @@ const ScreenHeader = ({ title, subtitle, navigation, back = false, home = false 
                 onPress={() => (back ? navigation.goBack() : navigation.openDrawer())}
                 style={styles.iconButton}
             >
-                {back ? <ArrowLeft color={colors.gold} size={22} /> : <Menu color={colors.gold} size={24} />}
+                {back ? (
+                    <ArrowLeft color={colors.gold} size={22} />
+                ) : (
+                    <Menu color={colors.gold} size={24} />
+                )}
             </TouchableOpacity>
             <View style={styles.heading}>
-                <Text numberOfLines={1} style={styles.title}>{title}</Text>
-                {subtitle ? <Text numberOfLines={1} style={styles.subtitle}>{subtitle}</Text> : null}
+                <Text numberOfLines={1} style={styles.title}>
+                    {title}
+                </Text>
+                {subtitle ? (
+                    <Text numberOfLines={1} style={styles.subtitle}>
+                        {subtitle}
+                    </Text>
+                ) : null}
             </View>
             {home ? (
                 <TouchableOpacity
                     accessibilityLabel="Open home"
                     accessibilityRole="button"
                     hitSlop={8}
-                    onPress={() => navigation.navigate('Home')}
+                    onPress={() =>
+                        navigation.navigate('Dashboard', {
+                            screen: 'Home',
+                        })
+                    }
                     style={styles.iconButton}
                 >
                     <Home color={colors.gold} size={21} />
                 </TouchableOpacity>
-            ) : <View style={styles.iconButton} />}
+            ) : (
+                <View style={styles.iconButton} />
+            )}
         </View>
     </SafeAreaView>
 );

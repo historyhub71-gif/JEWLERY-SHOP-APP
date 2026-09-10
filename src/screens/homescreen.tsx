@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 
 import { supabase } from '../lib/supabase';
+import { ArrowLeft, Menu } from 'lucide-react-native';
 
 type Metal = 'gold' | 'silver';
 
@@ -54,9 +56,11 @@ const GOLD_KARATS: GoldKarat[] = ['24K', '22K', '21K', '18K'];
  *
  * All simulated values are DISPLAY ONLY.
  *
- * Real values remain in Supabase and are used by Calculator.
+ * Real values remain in Supabase and are used as the
+ * source of truth for the selected market/local rate.
  *
- * Every 1 second the visible number makes a tiny movement.
+ * Every 1 second the visible number makes a tiny movement
+ * around the real Supabase value.
  */
 const SIMULATION_INTERVAL = 1000;
 
@@ -225,7 +229,7 @@ const getNextPkrPrice = (metal: Metal, currentPrice: number, basePrice: number) 
  * ============================================================
  */
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: any) {
     const [selectedKarat, setSelectedKarat] = useState<GoldKarat>('24K');
 
     const [goldUnit, setGoldUnit] = useState<'tola' | 'gram'>('tola');
@@ -259,9 +263,10 @@ export default function HomeScreen() {
      * REAL PKR BASE VALUES
      * ==========================================================
      *
-     * These come from metal_rates.
+     * These ALWAYS contain the currently selected real
+     * Supabase PKR rate.
      *
-     * They are NEVER modified by simulation.
+     * Simulation NEVER modifies these refs.
      */
 
     const realGoldPkrPriceRef = useRef<number | null>(null);
@@ -282,6 +287,17 @@ export default function HomeScreen() {
      * ==========================================================
      * DISPLAY PKR VALUES
      * ==========================================================
+     *
+     * These are intentionally kept because the HomeScreen
+     * has a visual live-rate simulation.
+     *
+     * They are always reset from the currently selected
+     * real Supabase rate whenever:
+     *
+     * - Gold karat changes
+     * - Gold unit changes
+     * - Silver unit changes
+     * - metal_rates refreshes
      */
 
     const [displayGoldPkrPrice, setDisplayGoldPkrPrice] = useState<number | null>(null);
@@ -356,121 +372,64 @@ export default function HomeScreen() {
      * ==========================================================
      * FETCH PKR METAL RATES
      * ==========================================================
+     *
+     * IMPORTANT FIX:
+     *
+     * This function ONLY fetches metal_rates.
+     *
+     * It does NOT calculate the selected unit here.
+     *
+     * The selected Gold/Silver rate is handled by the dedicated
+     * synchronization effect below.
+     *
+     * This prevents unit/karat changes from causing unnecessary
+     * database requests and race conditions.
      */
 
-    const fetchMetalRates = useCallback(
-        async (isRefresh = false) => {
-            try {
-                if (isRefresh) {
-                    setRefreshing(true);
-                    refreshingRef.current = true;
-                } else {
-                    setLoadingRates(true);
-                }
-
-                setRatesError(null);
-
-                const { data, error } = await supabase
-                    .from('metal_rates')
-                    .select('*')
-                    .in('metal', ['gold', 'silver'])
-                    .order('metal', {
-                        ascending: true,
-                    })
-                    .order('purity', {
-                        ascending: false,
-                    });
-
-                if (error) {
-                    throw error;
-                }
-
-                const rates = (data ?? []) as MetalRate[];
-
-                setMetalRates(rates);
-
-                /**
-                 * ======================================================
-                 * Update REAL PKR base prices
-                 * ======================================================
-                 *
-                 * Gold base = selected karat.
-                 *
-                 * Silver base = 999.
-                 */
-
-                const selectedGoldRate = rates.find(
-                    rate =>
-                        rate.metal === 'gold' &&
-                        Number(rate.purity) === Number(selectedKarat.replace('K', '')),
-                );
-
-                const silverRate = rates.find(
-                    rate => rate.metal === 'silver' && Number(rate.purity) === 999,
-                );
-
-                if (selectedGoldRate) {
-                    const goldBase =
-                        goldUnit === 'tola'
-                            ? Number(selectedGoldRate.rate_per_tola)
-                            : Number(selectedGoldRate.rate_per_gram);
-
-                    if (Number.isFinite(goldBase)) {
-                        realGoldPkrPriceRef.current = goldBase;
-
-                        setDisplayGoldPkrPrice(current => {
-                            if (current === null || !Number.isFinite(current)) {
-                                return getInitialPkrPrice('gold', goldBase);
-                            }
-
-                            if (Math.abs(current - goldBase) > GOLD_PKR_MAX_DISTANCE) {
-                                return getInitialPkrPrice('gold', goldBase);
-                            }
-
-                            return current;
-                        });
-                    }
-                }
-
-                if (silverRate) {
-                    const silverBase =
-                        silverUnit === 'tola'
-                            ? Number(silverRate.rate_per_tola)
-                            : Number(silverRate.rate_per_gram);
-
-                    if (Number.isFinite(silverBase)) {
-                        realSilverPkrPriceRef.current = silverBase;
-
-                        setDisplaySilverPkrPrice(current => {
-                            if (current === null || !Number.isFinite(current)) {
-                                return getInitialPkrPrice('silver', silverBase);
-                            }
-
-                            if (Math.abs(current - silverBase) > SILVER_PKR_MAX_DISTANCE) {
-                                return getInitialPkrPrice('silver', silverBase);
-                            }
-
-                            return current;
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('fetchMetalRates error:', error);
-
-                setRatesError(
-                    error instanceof Error ? error.message : 'Unable to load metal rates.',
-                );
-            } finally {
-                if (isRefresh) {
-                    setRefreshing(false);
-                    refreshingRef.current = false;
-                } else {
-                    setLoadingRates(false);
-                }
+    const fetchMetalRates = useCallback(async (isRefresh = false) => {
+        try {
+            if (isRefresh) {
+                setRefreshing(true);
+                refreshingRef.current = true;
+            } else {
+                setLoadingRates(true);
             }
-        },
-        [selectedKarat, goldUnit, silverUnit],
-    );
+
+            setRatesError(null);
+
+            const { data, error } = await supabase
+                .from('metal_rates')
+                .select('*')
+                .in('metal', ['gold', 'silver'])
+                .order('metal', {
+                    ascending: true,
+                })
+                .order('purity', {
+                    ascending: false,
+                });
+
+            if (error) {
+                throw error;
+            }
+
+            const rates = (data ?? []) as MetalRate[];
+
+            setMetalRates(rates);
+        } catch (error) {
+            console.error('fetchMetalRates error:', error);
+
+            setRatesError(
+                error instanceof Error ? error.message : 'Unable to load metal rates.',
+            );
+        } finally {
+            if (isRefresh) {
+                setRefreshing(false);
+                refreshingRef.current = false;
+            } else {
+                setLoadingRates(false);
+            }
+        }
+    }, []);
 
     /**
      * ==========================================================
@@ -619,61 +578,131 @@ export default function HomeScreen() {
 
     /**
      * ==========================================================
-     * REFRESH PKR BASE WHEN KARAT / UNIT CHANGES
+     * SELECTED LOCAL RATES
+     * ==========================================================
+     */
+
+    const selectedGoldRate = metalRates.find(
+        rate =>
+            rate.metal === 'gold' && Number(rate.purity) === Number(selectedKarat.replace('K', '')),
+    );
+
+    const silverRate = metalRates.find(
+        rate => rate.metal === 'silver' && Number(rate.purity) === 999,
+    );
+
+    /**
+     * ==========================================================
+     * SELECTED LOCAL PRICE
      * ==========================================================
      *
-     * This ensures that:
+     * These values are the REAL selected Supabase values.
      *
-     * 24K -> 22K
+     * Gold:
+     *   selectedKarat + selected unit
      *
-     * or
+     * Silver:
+     *   999 + selected unit
+     */
+
+    const selectedGoldPrice = selectedGoldRate
+        ? goldUnit === 'tola'
+            ? Number(selectedGoldRate.rate_per_tola)
+            : Number(selectedGoldRate.rate_per_gram)
+        : null;
+
+    const selectedSilverPrice = silverRate
+        ? silverUnit === 'tola'
+            ? Number(silverRate.rate_per_tola)
+            : Number(silverRate.rate_per_gram)
+        : null;
+
+    /**
+     * ==========================================================
+     * SYNCHRONIZE PKR SIMULATION BASE
+     * ==========================================================
      *
-     * Tola -> Gram
+     * THIS IS THE MAIN BUG FIX.
      *
-     * immediately updates the simulation base.
+     * Whenever:
+     *
+     * - Gold karat changes
+     * - Gold Tola/Gram changes
+     * - Silver Tola/Gram changes
+     * - metal_rates changes after refresh
+     *
+     * the simulation is immediately reset around the NEW
+     * selected real Supabase rate.
+     *
+     * Example:
+     *
+     * Gold 24K Tola
+     * 457,104.62
+     *
+     * ↓ user presses Gram
+     *
+     * Gold 24K Gram
+     * 39,189.35
+     *
+     * The simulation now starts around 39,189.35.
+     *
+     * It never continues from the old Tola base.
      */
 
     useEffect(() => {
-        const selectedGoldRate = metalRates.find(
-            rate =>
-                rate.metal === 'gold' &&
-                Number(rate.purity) === Number(selectedKarat.replace('K', '')),
-        );
+        /**
+         * ------------------------------------------------------
+         * GOLD
+         * ------------------------------------------------------
+         */
 
-        if (selectedGoldRate) {
-            const goldBase =
-                goldUnit === 'tola'
-                    ? Number(selectedGoldRate.rate_per_tola)
-                    : Number(selectedGoldRate.rate_per_gram);
+        if (selectedGoldPrice !== null && Number.isFinite(selectedGoldPrice)) {
+            realGoldPkrPriceRef.current = selectedGoldPrice;
 
-            if (Number.isFinite(goldBase)) {
-                realGoldPkrPriceRef.current = goldBase;
+            const initialGoldDisplay = getInitialPkrPrice('gold', selectedGoldPrice);
 
-                setDisplayGoldPkrPrice(getInitialPkrPrice('gold', goldBase));
+            setDisplayGoldPkrPrice(initialGoldDisplay);
 
-                setGoldPkrDirection('same');
-            }
+            setGoldPkrDirection('same');
+
+            animatePriceChange(goldPkrAnimation);
+        } else {
+            realGoldPkrPriceRef.current = null;
+
+            setDisplayGoldPkrPrice(null);
+
+            setGoldPkrDirection('same');
         }
 
-        const silverRate = metalRates.find(
-            rate => rate.metal === 'silver' && Number(rate.purity) === 999,
-        );
+        /**
+         * ------------------------------------------------------
+         * SILVER
+         * ------------------------------------------------------
+         */
 
-        if (silverRate) {
-            const silverBase =
-                silverUnit === 'tola'
-                    ? Number(silverRate.rate_per_tola)
-                    : Number(silverRate.rate_per_gram);
+        if (selectedSilverPrice !== null && Number.isFinite(selectedSilverPrice)) {
+            realSilverPkrPriceRef.current = selectedSilverPrice;
 
-            if (Number.isFinite(silverBase)) {
-                realSilverPkrPriceRef.current = silverBase;
+            const initialSilverDisplay = getInitialPkrPrice('silver', selectedSilverPrice);
 
-                setDisplaySilverPkrPrice(getInitialPkrPrice('silver', silverBase));
+            setDisplaySilverPkrPrice(initialSilverDisplay);
 
-                setSilverPkrDirection('same');
-            }
+            setSilverPkrDirection('same');
+
+            animatePriceChange(silverPkrAnimation);
+        } else {
+            realSilverPkrPriceRef.current = null;
+
+            setDisplaySilverPkrPrice(null);
+
+            setSilverPkrDirection('same');
         }
-    }, [selectedKarat, goldUnit, silverUnit, metalRates]);
+    }, [
+        selectedGoldPrice,
+        selectedSilverPrice,
+        goldPkrAnimation,
+        silverPkrAnimation,
+    ]);
 
     /**
      * ==========================================================
@@ -686,6 +715,17 @@ export default function HomeScreen() {
      * 2. Silver USD
      * 3. Gold PKR
      * 4. Silver PKR
+     *
+     * IMPORTANT:
+     *
+     * PKR simulation always uses:
+     *
+     * realGoldPkrPriceRef
+     * realSilverPkrPriceRef
+     *
+     * as the base.
+     *
+     * Therefore simulation never becomes the source of truth.
      */
 
     useEffect(() => {
@@ -790,7 +830,12 @@ export default function HomeScreen() {
         return () => {
             clearInterval(interval);
         };
-    }, [goldUsdAnimation, silverUsdAnimation, goldPkrAnimation, silverPkrAnimation]);
+    }, [
+        goldUsdAnimation,
+        silverUsdAnimation,
+        goldPkrAnimation,
+        silverPkrAnimation,
+    ]);
 
     /**
      * ==========================================================
@@ -840,6 +885,11 @@ export default function HomeScreen() {
 
             /**
              * Read both tables again.
+             *
+             * fetchMetalRates only updates metalRates.
+             *
+             * The synchronization effect will then automatically
+             * update the correct Gold/Silver PKR simulation base.
              */
             await Promise.all([fetchMetalRates(false), fetchMarketQuotes()]);
 
@@ -863,33 +913,6 @@ export default function HomeScreen() {
             refreshingRef.current = false;
         }
     }, [fetchMetalRates, fetchMarketQuotes]);
-
-    /**
-     * ==========================================================
-     * SELECTED LOCAL RATES
-     * ==========================================================
-     */
-
-    const selectedGoldRate = metalRates.find(
-        rate =>
-            rate.metal === 'gold' && Number(rate.purity) === Number(selectedKarat.replace('K', '')),
-    );
-
-    const silverRate = metalRates.find(
-        rate => rate.metal === 'silver' && Number(rate.purity) === 999,
-    );
-
-    const selectedGoldPrice = selectedGoldRate
-        ? goldUnit === 'tola'
-            ? selectedGoldRate.rate_per_tola
-            : selectedGoldRate.rate_per_gram
-        : null;
-
-    const selectedSilverPrice = silverRate
-        ? silverUnit === 'tola'
-            ? silverRate.rate_per_tola
-            : silverRate.rate_per_gram
-        : null;
 
     /**
      * ==========================================================
@@ -965,26 +988,55 @@ export default function HomeScreen() {
             }
         >
             {/* =====================================================
-          HEADER
-      ====================================================== */}
+              HEADER
+            ====================================================== */}
 
             <View style={styles.header}>
-                <View>
+                {/* LEFT SIDE - DRAWER */}
+                <TouchableOpacity
+                    accessibilityLabel="Open menu"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => navigation.getParent()?.openDrawer()}
+                    style={styles.headerIconButton}
+                    activeOpacity={0.8}
+                >
+                    <Menu color="#D4AF37" size={23} />
+                </TouchableOpacity>
+
+                {/* BRAND */}
+                <View style={styles.headerLeft}>
                     <Text style={styles.brand}>GOLDKING</Text>
 
                     <Text style={styles.subtitle}>Premium Gold & Silver</Text>
                 </View>
 
-                <View style={styles.liveHeaderBadge}>
-                    <View style={styles.liveDot} />
+                {/* RIGHT SIDE */}
+                <View style={styles.headerActions}>
+                    {/* EXIT / BACK */}
+                    <TouchableOpacity
+                        accessibilityLabel="Exit home"
+                        accessibilityRole="button"
+                        hitSlop={8}
+                        onPress={() => navigation.goBack()}
+                        style={styles.headerIconButton}
+                        activeOpacity={0.8}
+                    >
+                        <ArrowLeft color="#D4AF37" size={21} />
+                    </TouchableOpacity>
 
-                    <Text style={styles.liveHeaderText}>LIVE</Text>
+                    {/* LIVE */}
+                    <View style={styles.liveHeaderBadge}>
+                        <View style={styles.liveDot} />
+
+                        <Text style={styles.liveHeaderText}>LIVE</Text>
+                    </View>
                 </View>
             </View>
 
             {/* =====================================================
-          REFRESH STATUS
-      ====================================================== */}
+              REFRESH STATUS
+            ====================================================== */}
 
             {refreshStatus ? (
                 <View style={styles.statusCard}>
@@ -993,8 +1045,8 @@ export default function HomeScreen() {
             ) : null}
 
             {/* =====================================================
-          USD MARKET
-      ====================================================== */}
+              USD MARKET
+            ====================================================== */}
 
             <View style={styles.sectionHeader}>
                 <View>
@@ -1009,8 +1061,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          GOLD USD
-      ====================================================== */}
+              GOLD USD
+            ====================================================== */}
 
             <View style={styles.marketCard}>
                 <View style={styles.marketTopRow}>
@@ -1116,8 +1168,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          SILVER USD
-      ====================================================== */}
+              SILVER USD
+            ====================================================== */}
 
             <View style={styles.marketCard}>
                 <View style={styles.marketTopRow}>
@@ -1223,8 +1275,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          LOCAL PKR RATES
-      ====================================================== */}
+              LOCAL PKR RATES
+            ====================================================== */}
 
             <View style={[styles.sectionHeader, styles.localSectionHeader]}>
                 <View>
@@ -1241,8 +1293,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          GOLD PKR
-      ====================================================== */}
+              GOLD PKR
+            ====================================================== */}
 
             <View style={styles.rateCard}>
                 <View style={styles.rateCardHeader}>
@@ -1367,8 +1419,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          SILVER PKR
-      ====================================================== */}
+              SILVER PKR
+            ====================================================== */}
 
             <View style={styles.rateCard}>
                 <View style={styles.rateCardHeader}>
@@ -1470,8 +1522,8 @@ export default function HomeScreen() {
             </View>
 
             {/* =====================================================
-          ERROR
-      ====================================================== */}
+              ERROR
+            ====================================================== */}
 
             {ratesError ? (
                 <View style={styles.errorCard}>
@@ -1490,8 +1542,8 @@ export default function HomeScreen() {
             ) : null}
 
             {/* =====================================================
-          SOURCE
-      ====================================================== */}
+              SOURCE
+            ====================================================== */}
 
             <View style={styles.sourceContainer}>
                 <Text style={styles.sourceText}>Market source: Gold API</Text>
@@ -1525,6 +1577,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 22,
+    },
+
+    headerLeft: {
+        flex: 1,
+        marginLeft: 10,
+    },
+
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 10,
+    },
+
+    headerIconButton: {
+        width: 38,
+        height: 38,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#292929',
+        borderRadius: 10,
+        backgroundColor: '#181818',
+        marginLeft: 6,
     },
 
     brand: {

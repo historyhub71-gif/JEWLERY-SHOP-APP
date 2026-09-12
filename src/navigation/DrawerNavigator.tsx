@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Role } from 'react-native';
+import { View, Text, StyleSheet,} from 'react-native';
 import ShopRatesScreen from '../screens/ShopRatesScreen';
 import {
     createDrawerNavigator,
@@ -9,6 +9,7 @@ import {
 } from '@react-navigation/drawer';
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import MyCustomersScreen from '../screens/MyCustomersScreen';
 
 import SweetAlert from 'react-native-sweet-alert';
 
@@ -197,6 +198,16 @@ const DrawerNavigator = () => {
                     component={ShopRatesScreen}
                     options={{
                         drawerIcon: ({ color, size }) => <Gem color={color} size={size} />,
+                    }}
+                />
+            )}
+
+            {role === 'admin' && (
+                <Drawer.Screen
+                    name="My Customers"
+                    component={MyCustomersScreen}
+                    options={{
+                        drawerIcon: ({ color, size }) => <Users color={color} size={size} />,
                     }}
                 />
             )}
